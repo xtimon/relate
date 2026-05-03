@@ -53,7 +53,7 @@ def generate_moves(state: RealityState) -> List[Move]:
 
     moves.append(("seed", (), 1.0))
 
-    if not nx.is_connected(state.graph) and state.node_count >= 4:
+    if state.node_count >= 4 and not nx.is_connected(state.graph):
         components = sorted(nx.connected_components(state.graph), key=len, reverse=True)
         if len(components) >= 2:
             c1, c2 = list(components[0]), list(components[1])
@@ -140,6 +140,7 @@ def score_move_cheap(
     C: float,
     lcs: int,
     U: float,
+    size_penalty: float = 0.0,
 ) -> Tuple[float, Optional[RealityState]]:
     """
     Boltzmann score exp(−ΔE) for *move* using a cheap energy approximation.
@@ -147,6 +148,18 @@ def score_move_cheap(
     Eigenvalue decomposition and zlib compression are skipped during scoring;
     integrated information I is proxied by lcs/N and complexity U is held
     constant for this step (γ = 0.02 makes its intra-step variation negligible).
+
+    size_penalty adds the term ``+size_penalty * N²`` to the energy.
+    Its per-step delta for an expand move is ``≈ 2·size_penalty·N``, which
+    grows with N and counteracts the constant ``−vacuum`` drive.  The system
+    reaches a soft equilibrium at
+
+        N* ≈ vacuum / (2 · size_penalty)
+
+    so ``size_penalty = vacuum / (2 · N_target)`` calibrates the target size.
+    With the default ``vacuum=0.8`` and ``size_penalty=0.004`` the equilibrium
+    is around N* ≈ 100.  Setting ``size_penalty=0.0`` disables the term and
+    allows unbounded growth (original behaviour).
 
     For *deflate*, *seed*, and *connect* the score is fully analytical — no
     graph copy is needed.  For *expand* and *integrate* the move is applied
@@ -162,7 +175,7 @@ def score_move_cheap(
     priority = move[2] if len(move) > 2 else 1.0
     N = state.node_count
 
-    def _boltzmann(ns_C: float, ns_lcs: int, ns_N: int) -> float:
+    def _score(ns_C: float, ns_lcs: int, ns_N: int) -> float:
         ns_I_proxy = ns_lcs / max(1, ns_N)
         ns_E = (
             alpha * ns_C
@@ -170,26 +183,27 @@ def score_move_cheap(
             + gamma * U
             - vacuum * ns_N
             - connectivity * (ns_lcs / max(1, ns_N))
+            + size_penalty * ns_N ** 2
         )
         return priority * np.exp(-(ns_E - E))
 
     if move_type == "deflate":
-        # Isolated node: curvature 0, not part of the largest component.
-        return _boltzmann(C, lcs, N - 1), None
+        # Isolated node: curvature 0, outside largest component.
+        return _score(C, lcs, N - 1), None
 
     elif move_type == "seed":
         # Two fresh nodes + one edge: no new triangles, C unchanged.
-        return _boltzmann(C, max(lcs, 2), N + 2), None
+        return _score(C, max(lcs, 2), N + 2), None
 
     elif move_type == "connect":
-        # Cross-component edge: no common neighbours → no new triangles, C unchanged.
+        # Cross-component edge: no common neighbours → C and N unchanged.
         u, v = args
         comp_u = nx.node_connected_component(state.graph, u)
         comp_v = nx.node_connected_component(state.graph, v)
-        return _boltzmann(C, len(comp_u) + len(comp_v), N), None
+        return _score(C, len(comp_u) + len(comp_v), N), None
 
-    else:  # expand / integrate
+    else:  # expand / integrate: topology changes require a graph copy
         ns = apply_move(state, move)
         ns_C = compute_curvature(ns)
-        score = _boltzmann(ns_C, ns.largest_component_size(), ns.node_count)
+        score = _score(ns_C, ns.largest_component_size(), ns.node_count)
         return score, ns

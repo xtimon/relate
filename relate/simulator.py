@@ -49,9 +49,16 @@ class RealitySimulation:
     gamma : float
         Weight of complexity growth U (default 0.02).
     vacuum : float
-        Cost per node — controls equilibrium size (default 0.8).
+        Cost per node — controls the growth drive (default 0.8).
     connectivity : float
         Reward for the fraction of nodes in the largest component (default 3.0).
+    size_penalty : float
+        Coefficient of the ``+size_penalty · N²`` equilibrium term.  Its
+        per-step delta for an expand move is ``≈ 2·size_penalty·N``, which
+        grows with N and counteracts the constant ``−vacuum`` growth drive.
+        Soft equilibrium size: ``N* ≈ vacuum / (2·size_penalty)``.
+        With ``vacuum=0.8`` and ``size_penalty=0.004`` the system stabilises
+        near N* ≈ 100.  Set to 0.0 to allow unbounded growth (default 0.004).
     move_generator : callable, optional
         Function ``(state) → List[Move]``.  Defaults to the built-in
         :func:`~relate.dynamics.generate_moves`.  Supply your own to add
@@ -68,6 +75,7 @@ class RealitySimulation:
         gamma: float = 0.02,
         vacuum: float = 0.8,
         connectivity: float = 3.0,
+        size_penalty: float = 0.004,
         move_generator: Optional[Callable] = None,
         record_all_states: bool = True,
     ) -> None:
@@ -76,6 +84,7 @@ class RealitySimulation:
         self.gamma = gamma
         self.vacuum = vacuum
         self.connectivity = connectivity
+        self.size_penalty = size_penalty
         self.move_generator = move_generator or generate_moves
         self.record_all_states = record_all_states
 
@@ -107,12 +116,28 @@ class RealitySimulation:
         U = compute_accumulated_complexity(self.state, self.initial_serialized)
 
         lcs = self.state.largest_component_size()
-        E = (
+        lcs_fraction = lcs / max(1, self.state.node_count)
+
+        # E_exact uses the true I(G) and is stored in history.
+        E_exact = (
             self.alpha * C
             - self.beta * I
             + self.gamma * U
             - self.vacuum * self.state.node_count
-            - self.connectivity * (lcs / max(1, self.state.node_count))
+            - self.connectivity * lcs_fraction
+            + self.size_penalty * self.state.node_count ** 2
+        )
+
+        # E_scoring uses the same lcs/N proxy for I that score_move_cheap uses
+        # for candidates. This removes the spurious −β·lcs/N bonus that arises
+        # when exact I → 0 at large N while the candidate proxy remains ≈ 0.9·β.
+        E_scoring = (
+            self.alpha * C
+            - self.beta * lcs_fraction
+            + self.gamma * U
+            - self.vacuum * self.state.node_count
+            - self.connectivity * lcs_fraction
+            + self.size_penalty * self.state.node_count ** 2
         )
 
         moves = self.move_generator(self.state)
@@ -121,9 +146,10 @@ class RealitySimulation:
 
         for i, move in enumerate(moves):
             score, ns = score_move_cheap(
-                self.state, move, E,
+                self.state, move, E_scoring,
                 self.alpha, self.beta, self.gamma, self.vacuum, self.connectivity,
                 C, lcs, U,
+                self.size_penalty,
             )
             scores.append(score)
             if ns is not None:
@@ -179,7 +205,8 @@ class RealitySimulation:
             print(f"  RELATE — Relational Evolutionary Lattice")
             print(f"           for Algorithmic Time and Experience")
             print(f"  α={self.alpha}, β={self.beta}, γ={self.gamma}")
-            print(f"  vacuum={self.vacuum}, connectivity={self.connectivity}")
+            print(f"  vacuum={self.vacuum}, connectivity={self.connectivity}, "
+                  f"size_penalty={self.size_penalty}")
             print(f"{'=' * 70}\n")
 
         for i in range(steps):
