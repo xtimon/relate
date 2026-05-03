@@ -1,6 +1,6 @@
 import numpy as np
 import networkx as nx
-from scipy.sparse.linalg import eigs
+from scipy.sparse.linalg import eigs, ArpackNoConvergence
 from collections import defaultdict
 import zlib
 import random
@@ -73,10 +73,10 @@ class RealityState:
 def compute_local_curvature_field(state: RealityState) -> Dict[int, float]:
     local_curvature = defaultdict(float)
     
-    for u, v, w in state.triples:
+    for u, v, n_w in state.triples:
         w_uv = state.graph[u][v].get('weight', 1.0)
-        w_vw = state.graph[v][w].get('weight', 1.0)
-        w_wu = state.graph[w][u].get('weight', 1.0)
+        w_vw = state.graph[v][n_w].get('weight', 1.0)
+        w_wu = state.graph[n_w][u].get('weight', 1.0)
         
         eps = 1e-6
         a = 1.0 / (w_vw + eps)
@@ -95,8 +95,8 @@ def compute_local_curvature_field(state: RealityState) -> Dict[int, float]:
             deficit = A + B + C - np.pi
             local_curvature[u] += deficit / 3.0
             local_curvature[v] += deficit / 3.0
-            local_curvature[w] += deficit / 3.0
-        except:
+            local_curvature[n_w] += deficit / 3.0
+        except (ValueError, KeyError, ZeroDivisionError):
             continue
     
     return dict(local_curvature)
@@ -140,7 +140,7 @@ def compute_integrated_info(state: RealityState) -> float:
         
         # Комбинированная мера: алгебраическая связность + спектральная сложность
         return lambda_2 * (1.0 + spectral_entropy)
-    except:
+    except (np.linalg.LinAlgError, ValueError, ArpackNoConvergence):
         return 0.0
 
 def serialize_state(state: RealityState) -> bytes:
@@ -242,9 +242,9 @@ def apply_move(state: RealityState, move: Tuple) -> RealityState:
             ns.remove_node(node)
     
     elif move_type == 'seed':
-        ns.add_node()
-        ns.add_node()
-        ns.add_edge(ns._next_id-2, ns._next_id-1, weight=1.0)
+        a = ns.add_node()
+        b = ns.add_node()
+        ns.add_edge(a, b, weight=1.0)
     
     elif move_type == 'connect':
         u, v = args
@@ -388,7 +388,10 @@ def create_perfect_animation(sim: RealitySimulation, history: List[Dict],
     curv_max_hist = [h['curvature_max'] for h in history]
     curv_std_hist = [h['curvature_std'] for h in history]
     
+    current_pos = None
+
     def animate(frame_idx):
+        nonlocal current_pos
         ax1.clear()
         ax2.clear()
         
@@ -400,16 +403,14 @@ def create_perfect_animation(sim: RealitySimulation, history: List[Dict],
         ax1.set_facecolor('#1a1a2e')
         
         if state.node_count > 0:
-            # Позиции узлов — используем фиксированный layout для плавности
             if frame_idx == 0:
-                animate.pos = nx.spring_layout(state.graph, k=2, iterations=50, seed=42)
+                current_pos = nx.spring_layout(state.graph, k=2, iterations=50, seed=42)
             else:
-                # Обновляем layout только для новых узлов
                 try:
-                    animate.pos = nx.spring_layout(state.graph, k=2, iterations=15, 
-                                                  seed=42, pos=animate.pos)
-                except:
-                    animate.pos = nx.spring_layout(state.graph, k=2, iterations=50, seed=42)
+                    current_pos = nx.spring_layout(state.graph, k=2, iterations=15, 
+                                                   seed=42, pos=current_pos)
+                except (nx.NetworkXError, ValueError):
+                    current_pos = nx.spring_layout(state.graph, k=2, iterations=50, seed=42)
             
             curvatures = state.curvature_field
             if curvatures:
@@ -417,7 +418,7 @@ def create_perfect_animation(sim: RealitySimulation, history: List[Dict],
                 curv_vals = [curvatures.get(n, 0.0) for n in node_list]
                 
                 nx.draw_networkx_nodes(
-                    state.graph, animate.pos, ax=ax1,
+                    state.graph, current_pos, ax=ax1,
                     node_color=curv_vals,
                     cmap='RdBu_r',
                     vmin=-global_max, vmax=global_max,
@@ -425,8 +426,8 @@ def create_perfect_animation(sim: RealitySimulation, history: List[Dict],
                     alpha=0.9, edgecolors='white', linewidths=0.3
                 )
             
-            nx.draw_networkx_edges(state.graph, animate.pos, ax=ax1, 
-                                  alpha=0.15, width=0.3, edge_color='white')
+            nx.draw_networkx_edges(state.graph, current_pos, ax=ax1, 
+                                   alpha=0.15, width=0.3, edge_color='white')
         
         ax1.set_title(f'Поле кривизны (t={t}, N={state.node_count})', 
                      fontsize=12, fontweight='bold', color='white')
@@ -464,8 +465,6 @@ def create_perfect_animation(sim: RealitySimulation, history: List[Dict],
                      fontsize=14, fontweight='bold', color='white', y=1.01)
         
         return [ax1, ax2]
-    
-    animate.pos = None
     ani = FuncAnimation(fig, animate, frames=len(indices), 
                        interval=1000/fps, blit=False, repeat=True)
     
