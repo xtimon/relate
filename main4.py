@@ -254,6 +254,68 @@ def apply_move(state: RealityState, move: Tuple) -> RealityState:
     ns.curvature_field = compute_local_curvature_field(ns)
     return ns
 
+
+def score_move_cheap(state: RealityState, move: Tuple,
+                     E: float, alpha: float, beta: float, gamma: float,
+                     vacuum: float, connectivity: float,
+                     C: float, lcs: int, U: float) -> Tuple[float, object]:
+    """
+    Cheap approximate ΔE score for a candidate move.
+
+    - deflate / seed / connect: fully analytical — no graph copy, no eigenvalues.
+    - expand / integrate: one deepcopy + curvature recompute, but eigenvalue
+      decomposition and zlib compression are skipped. I is proxied by lcs/N,
+      U is held constant (γ=0.02 makes its per-step variation negligible).
+
+    Returns (score, candidate_state_or_None). For expand/integrate the computed
+    state is returned so the caller can reuse it if this move is chosen.
+    """
+    move_type, args = move[0], move[1]
+    priority = move[2] if len(move) > 2 else 1.0
+    N = state.node_count
+
+    if move_type == 'deflate':
+        # Isolated node contributes 0 curvature and is outside the largest component.
+        ns_N = N - 1
+        ns_lcs = lcs
+        ns_I_proxy = ns_lcs / max(1, ns_N)
+        ns_E = (alpha * C - beta * ns_I_proxy + gamma * U
+                - vacuum * ns_N - connectivity * (ns_lcs / max(1, ns_N)))
+        return priority * np.exp(-(ns_E - E)), None
+
+    elif move_type == 'seed':
+        # Two fresh nodes + one edge between them: no new triples, C unchanged.
+        ns_N = N + 2
+        ns_lcs = max(lcs, 2)
+        ns_I_proxy = ns_lcs / max(1, ns_N)
+        ns_E = (alpha * C - beta * ns_I_proxy + gamma * U
+                - vacuum * ns_N - connectivity * (ns_lcs / max(1, ns_N)))
+        return priority * np.exp(-(ns_E - E)), None
+
+    elif move_type == 'connect':
+        # Merges two components. Cross-component edge creates no new triples
+        # (the two endpoints share no neighbors before the connection).
+        u, v = args
+        comp_u = nx.node_connected_component(state.graph, u)
+        comp_v = nx.node_connected_component(state.graph, v)
+        ns_N = N
+        ns_lcs = len(comp_u) + len(comp_v)
+        ns_I_proxy = ns_lcs / max(1, ns_N)
+        ns_E = (alpha * C - beta * ns_I_proxy + gamma * U
+                - vacuum * ns_N - connectivity * (ns_lcs / max(1, ns_N)))
+        return priority * np.exp(-(ns_E - E)), None
+
+    else:  # expand or integrate: topology changes require a graph copy
+        ns = apply_move(state, move)
+        ns_C = compute_curvature(ns)
+        ns_N = ns.node_count
+        ns_lcs = ns.largest_component_size()
+        ns_I_proxy = ns_lcs / max(1, ns_N)
+        ns_E = (alpha * ns_C - beta * ns_I_proxy + gamma * U
+                - vacuum * ns_N - connectivity * (ns_lcs / max(1, ns_N)))
+        return priority * np.exp(-(ns_E - E)), ns
+
+
 # ============================================================
 # СИМУЛЯТОР
 # ============================================================
@@ -292,37 +354,41 @@ class RealitySimulation:
         C = compute_curvature(self.state)
         I = compute_integrated_info(self.state)
         U = compute_accumulated_complexity(self.state, self.initial_serialized)
-        
+
         lcs = self.state.largest_component_size()
-        E = (self.alpha * C 
-             - self.beta * I 
-             + self.gamma * U 
+        E = (self.alpha * C
+             - self.beta * I
+             + self.gamma * U
              - self.vacuum * self.state.node_count
              - self.connectivity * (lcs / max(1, self.state.node_count)))
-        
+
         moves = generate_moves(self.state)
-        scores = []
-        
-        for move in moves:
-            ns = apply_move(self.state, move)
-            ns_C = compute_curvature(ns)
-            ns_I = compute_integrated_info(ns)
-            ns_U = compute_accumulated_complexity(ns, self.initial_serialized)
-            ns_lcs = ns.largest_component_size()
-            ns_E = (self.alpha * ns_C 
-                    - self.beta * ns_I 
-                    + self.gamma * ns_U 
-                    - self.vacuum * ns.node_count
-                    - self.connectivity * (ns_lcs / max(1, ns.node_count)))
-            
-            priority = move[2] if len(move) > 2 else 1.0
-            scores.append(priority * np.exp(-(ns_E - E)))
-        
+        scores: List[float] = []
+        candidate_states: Dict[int, RealityState] = {}
+
+        for i, move in enumerate(moves):
+            score, ns = score_move_cheap(
+                self.state, move, E,
+                self.alpha, self.beta, self.gamma, self.vacuum, self.connectivity,
+                C, lcs, U,
+            )
+            scores.append(score)
+            if ns is not None:
+                candidate_states[i] = ns
+
         total = sum(scores)
-        probs = [s/total for s in scores] if total > 0 else [1/len(scores)]*len(scores)
-        
-        chosen = moves[np.random.choice(len(moves), p=probs)]
-        self.state = apply_move(self.state, chosen)
+        probs = [s / total for s in scores] if total > 0 else [1 / len(scores)] * len(scores)
+
+        chosen_idx = np.random.choice(len(moves), p=probs)
+        chosen = moves[chosen_idx]
+
+        # Reuse the state already computed during scoring when available (expand/integrate),
+        # otherwise apply the move now (deflate/seed/connect were not materialized).
+        if chosen_idx in candidate_states:
+            self.state = candidate_states[chosen_idx]
+        else:
+            self.state = apply_move(self.state, chosen)
+
         self.all_states.append(self._copy_state(self.state))
         
         curvs = list(self.state.curvature_field.values()) or [0.0]
