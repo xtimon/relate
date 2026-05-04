@@ -49,6 +49,17 @@ move types without modifying library code::
 """
 
 from .dynamics import apply_move, generate_moves, score_move_cheap
+from .measures import (
+    complexity_slope,
+    degree_distribution,
+    integrate_event_analysis,
+    monotonicity_score,
+    network_summary,
+    power_law_exponent,
+    ricci_curvature_distribution,
+    small_world_metrics,
+    spectral_dimension,
+)
 from .physics import (
     compute_accumulated_complexity,
     compute_curvature,
@@ -77,6 +88,16 @@ __all__ = [
     "score_move_cheap",
     # simulator
     "RealitySimulation",
+    # measures
+    "spectral_dimension",
+    "ricci_curvature_distribution",
+    "degree_distribution",
+    "power_law_exponent",
+    "small_world_metrics",
+    "complexity_slope",
+    "integrate_event_analysis",
+    "monotonicity_score",
+    "network_summary",
     # viz
     "create_perfect_animation",
     "plot_final_universe",

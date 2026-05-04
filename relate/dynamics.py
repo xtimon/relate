@@ -2,13 +2,17 @@
 Move generation, application, and cheap scoring for the graph universe.
 
 A *move* is a 3-tuple  (move_type: str, args: tuple, priority: float).
-Five built-in move types are provided:
+Six built-in move types are provided:
 
-    expand    — subdivide an edge by inserting a new node
-    integrate — collapse a triangle into a single particle node
-    deflate   — remove an isolated (degree-0) node
-    seed      — vacuum fluctuation: add a disconnected node pair
-    connect   — bridge the two largest components with a weak edge
+    expand      — subdivide an edge by inserting a new node
+    integrate   — collapse a triangle into a single particle node
+    deflate     — remove an isolated (degree-0) node
+    seed        — vacuum fluctuation: add a disconnected node pair
+    connect     — bridge the two largest components with a weak edge
+    triangulate — close an open triangle (add edge between two non-adjacent
+                  nodes that share a common neighbour).  ΔN=0, ΔT≥1.
+                  This is the primary mechanism for increasing topological
+                  density and pushing the spectral dimension toward d_s=2.
 
 Custom move generators can be passed to RealitySimulation via the
 `move_generator` parameter, as long as they produce the same 3-tuple format.
@@ -59,6 +63,28 @@ def generate_moves(state: RealityState) -> List[Move]:
             c1, c2 = list(components[0]), list(components[1])
             if c1 and c2:
                 moves.append(("connect", (random.choice(c1), random.choice(c2)), 3.0))
+
+    # TRIANGULATE: close an open triangle (ΔN=0, ΔT≥1).
+    # Sample nodes, collect non-adjacent neighbour pairs, pick up to 8.
+    if state.node_count >= 3:
+        open_pairs: List[Tuple[int, int]] = []
+        sample_nodes = random.sample(
+            list(state.graph.nodes()), min(20, state.node_count)
+        )
+        for w in sample_nodes:
+            nbs = list(state.graph.neighbors(w))
+            for i in range(len(nbs)):
+                for j in range(i + 1, len(nbs)):
+                    u, v = nbs[i], nbs[j]
+                    if not state.graph.has_edge(u, v):
+                        open_pairs.append((u, v))
+                if len(open_pairs) >= 30:
+                    break
+            if len(open_pairs) >= 30:
+                break
+        if open_pairs:
+            for u, v in random.sample(open_pairs, min(8, len(open_pairs))):
+                moves.append(("triangulate", (u, v), 2.0))
 
     return moves
 
@@ -120,6 +146,11 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
         if u in ns.graph and v in ns.graph:
             ns.add_edge(u, v, weight=0.3)
 
+    elif move_type == "triangulate":
+        u, v = args
+        if u in ns.graph and v in ns.graph and not ns.graph.has_edge(u, v):
+            ns.add_edge(u, v, weight=1.0)
+
     ns.curvature_field = compute_local_curvature_field(ns)
     return ns
 
@@ -141,6 +172,7 @@ def score_move_cheap(
     lcs: int,
     U: float,
     size_penalty: float = 0.0,
+    topology_reward: float = 0.0,
 ) -> Tuple[float, Optional[RealityState]]:
     """
     Boltzmann score exp(−ΔE) for *move* using a cheap energy approximation.
@@ -149,22 +181,20 @@ def score_move_cheap(
     integrated information I is proxied by lcs/N and complexity U is held
     constant for this step (γ = 0.02 makes its intra-step variation negligible).
 
-    size_penalty adds the term ``+size_penalty * N²`` to the energy.
-    Its per-step delta for an expand move is ``≈ 2·size_penalty·N``, which
-    grows with N and counteracts the constant ``−vacuum`` drive.  The system
-    reaches a soft equilibrium at
+    size_penalty adds ``+size_penalty * N²`` to the energy; its per-step
+    delta for expand is ``≈ 2·size_penalty·N``, creating a soft equilibrium
+    at ``N* ≈ vacuum / (2·size_penalty)``.
 
-        N* ≈ vacuum / (2 · size_penalty)
+    topology_reward adds ``−topology_reward * T/N`` where T = triangle count.
+    Moves that increase T relative to N (especially *triangulate*) lower the
+    energy and are preferentially selected, driving topological density and
+    spectral dimension upward toward d_s ≈ 2.
 
-    so ``size_penalty = vacuum / (2 · N_target)`` calibrates the target size.
-    With the default ``vacuum=0.8`` and ``size_penalty=0.004`` the equilibrium
-    is around N* ≈ 100.  Setting ``size_penalty=0.0`` disables the term and
-    allows unbounded growth (original behaviour).
-
-    For *deflate*, *seed*, and *connect* the score is fully analytical — no
-    graph copy is needed.  For *expand* and *integrate* the move is applied
-    to a graph copy so that the updated curvature can be used; the resulting
-    state is returned so the caller can reuse it if this move is chosen.
+    For *deflate*, *seed*, *connect*, and *triangulate* the score is fully
+    analytical — no graph copy is needed.  For *expand* and *integrate* the
+    move is applied to a graph copy so that the updated curvature and
+    triangle count can be used; the resulting state is returned so the
+    caller can reuse it if this move is chosen.
 
     Returns
     -------
@@ -174,8 +204,9 @@ def score_move_cheap(
     move_type, args = move[0], move[1]
     priority = move[2] if len(move) > 2 else 1.0
     N = state.node_count
+    T = state.triple_count
 
-    def _score(ns_C: float, ns_lcs: int, ns_N: int) -> float:
+    def _score(ns_C: float, ns_lcs: int, ns_N: int, ns_T: int) -> float:
         ns_I_proxy = ns_lcs / max(1, ns_N)
         ns_E = (
             alpha * ns_C
@@ -184,26 +215,34 @@ def score_move_cheap(
             - vacuum * ns_N
             - connectivity * (ns_lcs / max(1, ns_N))
             + size_penalty * ns_N ** 2
+            - topology_reward * ns_T / max(1, ns_N)
         )
         return priority * np.exp(-(ns_E - E))
 
     if move_type == "deflate":
-        # Isolated node: curvature 0, outside largest component.
-        return _score(C, lcs, N - 1), None
+        # Isolated node: curvature 0, outside largest component, no triangles.
+        return _score(C, lcs, N - 1, T), None
 
     elif move_type == "seed":
-        # Two fresh nodes + one edge: no new triangles, C unchanged.
-        return _score(C, max(lcs, 2), N + 2), None
+        # Two fresh nodes + one edge: no new triangles.
+        return _score(C, max(lcs, 2), N + 2, T), None
 
     elif move_type == "connect":
-        # Cross-component edge: no common neighbours → C and N unchanged.
+        # Cross-component edge: endpoints share no neighbours → no new triangles.
         u, v = args
         comp_u = nx.node_connected_component(state.graph, u)
         comp_v = nx.node_connected_component(state.graph, v)
-        return _score(C, len(comp_u) + len(comp_v), N), None
+        return _score(C, len(comp_u) + len(comp_v), N, T), None
+
+    elif move_type == "triangulate":
+        # ΔN=0, ΔT = common neighbours of u and v (exact, no copy needed).
+        u, v = args
+        common = len(set(state.graph.neighbors(u)) & set(state.graph.neighbors(v)))
+        return _score(C, lcs, N, T + common), None
 
     else:  # expand / integrate: topology changes require a graph copy
         ns = apply_move(state, move)
         ns_C = compute_curvature(ns)
-        score = _score(ns_C, ns.largest_component_size(), ns.node_count)
+        score = _score(ns_C, ns.largest_component_size(), ns.node_count,
+                       ns.triple_count)
         return score, ns

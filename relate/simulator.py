@@ -53,12 +53,15 @@ class RealitySimulation:
     connectivity : float
         Reward for the fraction of nodes in the largest component (default 3.0).
     size_penalty : float
-        Coefficient of the ``+size_penalty · N²`` equilibrium term.  Its
-        per-step delta for an expand move is ``≈ 2·size_penalty·N``, which
-        grows with N and counteracts the constant ``−vacuum`` growth drive.
-        Soft equilibrium size: ``N* ≈ vacuum / (2·size_penalty)``.
-        With ``vacuum=0.8`` and ``size_penalty=0.004`` the system stabilises
-        near N* ≈ 100.  Set to 0.0 to allow unbounded growth (default 0.004).
+        Coefficient of the ``+size_penalty · N²`` equilibrium term.
+        Soft equilibrium: ``N* ≈ vacuum / (2·size_penalty)``.
+        Default 0.004 → N* ≈ 100.  Set to 0.0 for unbounded growth.
+    topology_reward : float
+        Coefficient of the ``−topology_reward · T/N`` term, where T is the
+        triangle count.  Positive values make moves that increase triangles
+        (especially *triangulate*) energetically favourable, driving the graph
+        toward higher topological density and larger spectral dimension d_s.
+        Default 0.0 (disabled).  Try values 2–10 to push d_s toward 2.
     move_generator : callable, optional
         Function ``(state) → List[Move]``.  Defaults to the built-in
         :func:`~relate.dynamics.generate_moves`.  Supply your own to add
@@ -76,6 +79,7 @@ class RealitySimulation:
         vacuum: float = 0.8,
         connectivity: float = 3.0,
         size_penalty: float = 0.004,
+        topology_reward: float = 0.0,
         move_generator: Optional[Callable] = None,
         record_all_states: bool = True,
     ) -> None:
@@ -85,6 +89,7 @@ class RealitySimulation:
         self.vacuum = vacuum
         self.connectivity = connectivity
         self.size_penalty = size_penalty
+        self.topology_reward = topology_reward
         self.move_generator = move_generator or generate_moves
         self.record_all_states = record_all_states
 
@@ -119,6 +124,11 @@ class RealitySimulation:
         lcs_fraction = lcs / max(1, self.state.node_count)
 
         # E_exact uses the true I(G) and is stored in history.
+        topo_term = (
+            -self.topology_reward * self.state.triple_count
+            / max(1, self.state.node_count)
+        )
+
         E_exact = (
             self.alpha * C
             - self.beta * I
@@ -126,6 +136,7 @@ class RealitySimulation:
             - self.vacuum * self.state.node_count
             - self.connectivity * lcs_fraction
             + self.size_penalty * self.state.node_count ** 2
+            + topo_term
         )
 
         # E_scoring uses the same lcs/N proxy for I that score_move_cheap uses
@@ -138,6 +149,7 @@ class RealitySimulation:
             - self.vacuum * self.state.node_count
             - self.connectivity * lcs_fraction
             + self.size_penalty * self.state.node_count ** 2
+            + topo_term
         )
 
         moves = self.move_generator(self.state)
@@ -150,6 +162,7 @@ class RealitySimulation:
                 self.alpha, self.beta, self.gamma, self.vacuum, self.connectivity,
                 C, lcs, U,
                 self.size_penalty,
+                self.topology_reward,
             )
             scores.append(score)
             if ns is not None:
@@ -206,7 +219,8 @@ class RealitySimulation:
             print(f"           for Algorithmic Time and Experience")
             print(f"  α={self.alpha}, β={self.beta}, γ={self.gamma}")
             print(f"  vacuum={self.vacuum}, connectivity={self.connectivity}, "
-                  f"size_penalty={self.size_penalty}")
+                  f"size_penalty={self.size_penalty}, "
+                  f"topology_reward={self.topology_reward}")
             print(f"{'=' * 70}\n")
 
         for i in range(steps):

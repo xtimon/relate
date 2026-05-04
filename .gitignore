@@ -22,11 +22,6 @@ env/
 .ipynb_checkpoints/
 *.ipynb
 
-# Output files
-*.gif
-*.png
-*.pdf
-
 # macOS
 .DS_Store
 
