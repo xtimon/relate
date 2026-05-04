@@ -62,6 +62,17 @@ class RealitySimulation:
         (especially *triangulate*) energetically favourable, driving the graph
         toward higher topological density and larger spectral dimension d_s.
         Default 0.0 (disabled).  Try values 2–10 to push d_s toward 2.
+    i_update_interval : int
+        Recompute exact I(G) (eigenvalue decomposition) only every this many
+        steps; cached value is used in between.  Default 1 (every step).
+        Set to 10–50 for long runs to get a ~10–50× speedup when the
+        precise per-step I trajectory is not needed.  The history record
+        always contains the most recently computed I.
+    initial_state : RealityState, optional
+        Start from a pre-built state instead of the default two-node seed.
+        Useful for testing different initial topologies (torus, random graph,
+        etc.).  The state is cloned on entry; curvature must already be
+        computed (call ``compute_local_curvature_field`` beforehand).
     move_generator : callable, optional
         Function ``(state) → List[Move]``.  Defaults to the built-in
         :func:`~relate.dynamics.generate_moves`.  Supply your own to add
@@ -80,6 +91,8 @@ class RealitySimulation:
         connectivity: float = 3.0,
         size_penalty: float = 0.004,
         topology_reward: float = 0.0,
+        i_update_interval: int = 1,
+        initial_state: Optional["RealityState"] = None,
         move_generator: Optional[Callable] = None,
         record_all_states: bool = True,
     ) -> None:
@@ -90,16 +103,22 @@ class RealitySimulation:
         self.connectivity = connectivity
         self.size_penalty = size_penalty
         self.topology_reward = topology_reward
+        self.i_update_interval = max(1, i_update_interval)
         self.move_generator = move_generator or generate_moves
         self.record_all_states = record_all_states
 
-        self.state = RealityState()
-        u = self.state.add_node()
-        v = self.state.add_node()
-        self.state.add_edge(u, v, weight=1.0)
-        self.state.curvature_field = compute_local_curvature_field(self.state)
+        if initial_state is not None:
+            self.state = initial_state.clone()
+        else:
+            self.state = RealityState()
+            u = self.state.add_node()
+            v = self.state.add_node()
+            self.state.add_edge(u, v, weight=1.0)
+            self.state.curvature_field = compute_local_curvature_field(self.state)
 
         self.initial_serialized: bytes = serialize_state(self.state)
+        self._cached_I: float = 0.0
+        self._steps_since_I_update: int = self.i_update_interval  # force update on first step
         self.history: List[Dict] = []
         self.all_states: List[RealityState] = (
             [self.state.clone()] if record_all_states else []
@@ -117,8 +136,13 @@ class RealitySimulation:
         (consistent with the original main4.py behaviour).
         """
         C = compute_curvature(self.state)
-        I = compute_integrated_info(self.state)
         U = compute_accumulated_complexity(self.state, self.initial_serialized)
+
+        self._steps_since_I_update += 1
+        if self._steps_since_I_update >= self.i_update_interval:
+            self._cached_I = compute_integrated_info(self.state)
+            self._steps_since_I_update = 0
+        I = self._cached_I
 
         lcs = self.state.largest_component_size()
         lcs_fraction = lcs / max(1, self.state.node_count)
