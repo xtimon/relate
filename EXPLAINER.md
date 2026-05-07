@@ -47,7 +47,7 @@ moves:
 | **seed** | A pair of dots pops out of nowhere (like a bubble) | _nothing_ → `o──o` |
 | **deflate** | Removes a lonely dot that has no friends | `o` → _gone_ |
 | **connect** | Draws a string between two big lonely chunks | `▣  ▣` → `▣──▣` |
-| **triangulate** | Closes an open shape into a triangle | `o─o─o` → `△` |
+| **triangulate** | Closes an open shape into a triangle (ΔN=0, ΔT≥1) | `o─o─o` → `△` |
 
 So the universe is constantly **growing, shrinking, and rearranging itself**.
 

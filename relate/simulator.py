@@ -5,7 +5,7 @@ RELATE: Relational Evolutionary Lattice for Algorithmic Time and Experience
 
 Energy functional
 -----------------
-    E = α·C − β·I + γ·U − vacuum·N − connectivity·(LCS/N)
+    E = α·C − β·I + γ·U − vacuum·N − connectivity·(LCS/N) − topology_reward·T/N
 
 where
     C   = integrated squared Regge curvature
@@ -13,6 +13,7 @@ where
     U   = Kolmogorov-complexity proxy (zlib growth)
     N   = node count
     LCS = largest connected-component size
+    T   = triangle count
 
 At each step the simulator:
   1. Evaluates E for the current state.
@@ -20,6 +21,15 @@ At each step the simulator:
   3. Scores each move cheaply (no eigenvalues in the inner loop).
   4. Samples a move proportionally to exp(−ΔE) × priority.
   5. Applies the chosen move and records observables.
+
+Six move types are available:
+
+    expand      — subdivide an edge by inserting a new node (ΔN=+1, ΔE=+2)
+    integrate   — collapse a triangle into a single particle node (ΔN=−2)
+    deflate     — remove an isolated (degree-0) node (ΔN=−1)
+    seed        — vacuum fluctuation: add a disconnected node pair (ΔN=+2)
+    connect     — bridge two components with a weak edge (ΔN=0)
+    triangulate — close an open triangle (ΔN=0, ΔT≥1)
 """
 
 import zlib
@@ -274,7 +284,7 @@ class RealitySimulation:
         lcs = s.largest_component_size()
         print(f"  Largest comp.:  {lcs} ({100 * lcs / max(1, s.node_count):.1f}%)")
         print("\nEvent counts:")
-        for mt in ("expand", "integrate", "connect", "seed", "deflate"):
+        for mt in ("expand", "integrate", "connect", "seed", "deflate", "triangulate"):
             print(f"  {mt:12s}: {sum(1 for r in h if r['move_type'] == mt)}")
         print("\nCurvature ripple:")
         print(f"  Max amplitude:  {max(r['curvature_max'] for r in h):.4e}")

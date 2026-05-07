@@ -2,6 +2,8 @@
 
 **Relational Evolutionary Lattice for Algorithmic Time and Experience**
 
+[![CI](https://github.com/xtimon/relate/actions/workflows/ci.yml/badge.svg)](https://github.com/xtimon/relate/actions/workflows/ci.yml)
+
 A graph-universe simulation where discrete space-time emerges from self-organisation. The universe is a weighted graph that evolves by minimising an energy functional combining Regge-calculus curvature, spectral integrated information, and Kolmogorov complexity.
 
 ---
@@ -172,7 +174,27 @@ examples/
 ├── finite_size_scaling.py
 ├── hub_mechanism.py
 └── fss_torus.py
+tests/
+├── conftest.py    # Shared fixtures (auto-seeding random state)
+├── test_dynamics.py
+├── test_physics.py
+├── test_simulator.py
+└── test_measures.py
 ```
+
+---
+
+## CI / Code Quality
+
+The project runs a full CI pipeline on every push/PR to `main`:
+
+| Job | What it does |
+|---|---|
+| **test** | Python 3.10–3.13 matrix: `ruff check`, `ruff format --check`, `pytest --cov`, import verification |
+| **type-check** | `mypy relate/ --ignore-missing-imports --check-untyped-defs` (Python 3.13) |
+| **examples** | Runs 4 example scripts (`quantum_breath`, `thermodynamics`, `hub_mechanism`, `initial_topology`) with `MPLBACKEND=Agg` |
+
+All checks must pass before merging.
 
 ---
 
