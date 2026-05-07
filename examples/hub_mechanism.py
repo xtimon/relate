@@ -39,7 +39,7 @@ import networkx as nx
 import numpy as np
 from scipy import stats as scipy_stats
 
-from relate.dynamics import apply_move, generate_moves, score_move_cheap
+from relate.dynamics import MoveType, ScoringParams, apply_move, generate_moves, score_move_cheap
 from relate.measures import power_law_exponent
 from relate.physics import (
     compute_accumulated_complexity,
@@ -56,13 +56,13 @@ def generate_moves_reduced(state: RealityState):
     if state.edge_count > 0:
         edges = list(state.graph.edges())
         for u, v in random.sample(edges, min(15, len(edges))):
-            moves.append(("expand", (u, v), 1.0))
+            moves.append((MoveType.EXPAND, (u, v), 1.0))
     if state.triple_count > 0:
         triples = list(state.triples)
         for t in random.sample(triples, min(10, len(triples))):
-            moves.append(("integrate", t, 1.0))
+            moves.append((MoveType.INTEGRATE, t, 1.0))
     if not moves:
-        moves.append(("seed", (), 1.0))
+        moves.append((MoveType.SEED, (), 1.0))
     return moves
 
 
@@ -95,10 +95,12 @@ def run_reduced(n_steps: int, alpha=0.3, beta=3.0, gamma=0.02,
 
         moves = generate_moves_reduced(state)
         scores, cands = [], {}
+        params = ScoringParams(alpha=alpha, beta=beta, gamma=gamma,
+                               vacuum=vacuum, connectivity=connectivity,
+                               size_penalty=size_penalty,
+                               topology_reward=topology_reward)
         for i, move in enumerate(moves):
-            sc, ns = score_move_cheap(state, move, E, alpha, beta, gamma,
-                                      vacuum, connectivity, C, lcs, U,
-                                      size_penalty, topology_reward)
+            sc, ns = score_move_cheap(state, move, E, params, C, lcs, U)
             scores.append(sc)
             if ns is not None: cands[i] = ns
 
