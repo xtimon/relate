@@ -96,7 +96,7 @@ def compute_integrated_info(state: RealityState) -> float:
             -np.sum(probs * np.log(probs + 1e-10)) / np.log(len(eigenvalues) + 1)
         )
 
-        return lambda_2 * (1.0 + spectral_entropy)
+        return float(lambda_2 * (1.0 + spectral_entropy))
     except (np.linalg.LinAlgError, ValueError, ArpackNoConvergence):
         return 0.0
 

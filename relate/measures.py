@@ -114,7 +114,7 @@ def power_law_exponent(state: RealityState, k_min_percentile: float = 75.0) -> f
     return float(gamma)
 
 
-def small_world_metrics(state: RealityState) -> dict[str, float]:
+def small_world_metrics(state: RealityState) -> dict[str, float | None]:
     """
     Clustering coefficient, average path length, and small-world index ω.
 

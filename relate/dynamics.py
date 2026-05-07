@@ -216,7 +216,7 @@ def score_move_cheap(
             + size_penalty * ns_N ** 2
             - topology_reward * ns_T / max(1, ns_N)
         )
-        return priority * np.exp(-(ns_E - E))
+        return float(priority * np.exp(-(ns_E - E)))
 
     if move_type == "deflate":
         # Isolated node: curvature 0, outside largest component, no triangles.
@@ -228,10 +228,13 @@ def score_move_cheap(
 
     elif move_type == "connect":
         # Cross-component edge: endpoints share no neighbours → no new triangles.
+        # The new LCS is the merged component size, but only if it exceeds the
+        # current LCS (there may be a third, larger component that is untouched).
         u, v = args
         comp_u = nx.node_connected_component(state.graph, u)
         comp_v = nx.node_connected_component(state.graph, v)
-        return _score(C, len(comp_u) + len(comp_v), N, T), None
+        merged = len(comp_u) + len(comp_v)
+        return _score(C, max(merged, lcs), N, T), None
 
     elif move_type == "triangulate":
         # ΔN=0, ΔT = common neighbours of u and v (exact, no copy needed).
