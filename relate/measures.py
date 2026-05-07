@@ -16,6 +16,7 @@ from .state import RealityState
 #  Geometry                                                            #
 # ------------------------------------------------------------------ #
 
+
 def spectral_dimension(
     state: RealityState,
     t_values: np.ndarray | None = None,
@@ -75,8 +76,7 @@ def ricci_curvature_distribution(state: RealityState) -> dict[str, float]:
     """
     vals = list(state.curvature_field.values())
     if not vals:
-        return {"mean": 0.0, "std": 0.0, "max": 0.0, "min": 0.0,
-                "positive_fraction": 0.0}
+        return {"mean": 0.0, "std": 0.0, "max": 0.0, "min": 0.0, "positive_fraction": 0.0}
     arr = np.array(vals)
     return {
         "mean": float(np.mean(arr)),
@@ -90,6 +90,7 @@ def ricci_curvature_distribution(state: RealityState) -> dict[str, float]:
 # ------------------------------------------------------------------ #
 #  Network topology                                                    #
 # ------------------------------------------------------------------ #
+
 
 def degree_distribution(state: RealityState) -> dict[int, int]:
     """Return ``{degree: node_count}`` histogram."""
@@ -150,6 +151,7 @@ def small_world_metrics(state: RealityState) -> dict[str, float | None]:
 #  Thermodynamics / information                                        #
 # ------------------------------------------------------------------ #
 
+
 def complexity_slope(history: list[dict], window: int = 20) -> float:
     """
     Linear slope dU/dt estimated over the last *window* steps.
@@ -170,8 +172,7 @@ def integrate_event_analysis(history: list[dict]) -> dict:
     """
     events = [h for h in history if h["move_type"] == "integrate"]
     if not events:
-        return {"count": 0, "times": [], "curv_amplitudes": [],
-                "mean_interval": None}
+        return {"count": 0, "times": [], "curv_amplitudes": [], "mean_interval": None}
     times = [h["time"] for h in events]
     amplitudes = [h["curvature_max"] for h in events]
     intervals = [times[i + 1] - times[i] for i in range(len(times) - 1)]
@@ -200,6 +201,7 @@ def monotonicity_score(history: list[dict], key: str = "U") -> float:
 #  Full summary                                                        #
 # ------------------------------------------------------------------ #
 
+
 def network_summary(state: RealityState) -> dict:
     """All structural metrics in a single dict."""
     G = state.graph
@@ -221,6 +223,7 @@ def network_summary(state: RealityState) -> dict:
 # ------------------------------------------------------------------ #
 #  Internal helpers                                                    #
 # ------------------------------------------------------------------ #
+
 
 def _largest_component(state: RealityState) -> nx.Graph:
     if state.node_count == 0:

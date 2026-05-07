@@ -5,7 +5,6 @@ Covers: curvature computation, integrated information, serialization,
         Kolmogorov complexity proxy.
 """
 
-
 import numpy as np
 import pytest
 
@@ -19,6 +18,7 @@ from relate.physics import (
 from relate.state import RealityState
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def empty_state():
@@ -79,6 +79,7 @@ def tetrahedron_state():
 
 
 # ── compute_local_curvature_field ─────────────────────────────────────────────
+
 
 class TestComputeLocalCurvatureField:
     """Regge-calculus angle-deficit curvature at each node."""
@@ -184,6 +185,7 @@ class TestComputeLocalCurvatureField:
 
 # ── compute_curvature ─────────────────────────────────────────────────────────
 
+
 class TestComputeCurvature:
     """Integrated squared curvature C(G) = Σ δ(v)²."""
 
@@ -223,6 +225,7 @@ class TestComputeCurvature:
 
 
 # ── compute_integrated_info ───────────────────────────────────────────────────
+
 
 class TestComputeIntegratedInfo:
     """Spectral measure combining λ₂ and spectral entropy."""
@@ -289,6 +292,7 @@ class TestComputeIntegratedInfo:
 
 # ── serialize_state ───────────────────────────────────────────────────────────
 
+
 class TestSerializeState:
     """Canonical byte representation of the graph."""
 
@@ -336,6 +340,7 @@ class TestSerializeState:
 
 
 # ── compute_accumulated_complexity ────────────────────────────────────────────
+
 
 class TestComputeAccumulatedComplexity:
     """Kolmogorov-complexity proxy via zlib compression growth."""

@@ -121,9 +121,7 @@ class RealitySimulation:
         self._cached_I: float = 0.0
         self._steps_since_I_update: int = self.i_update_interval  # force update on first step
         self.history: list[dict] = []
-        self.all_states: list[RealityState] = (
-            [self.state.clone()] if record_all_states else []
-        )
+        self.all_states: list[RealityState] = [self.state.clone()] if record_all_states else []
 
     # ------------------------------------------------------------------
     # Single step
@@ -149,10 +147,7 @@ class RealitySimulation:
         lcs_fraction = lcs / max(1, self.state.node_count)
 
         # E_exact uses the true I(G) and is stored in history.
-        topo_term = (
-            -self.topology_reward * self.state.triple_count
-            / max(1, self.state.node_count)
-        )
+        topo_term = -self.topology_reward * self.state.triple_count / max(1, self.state.node_count)
 
         # E_scoring uses the same lcs/N proxy for I that score_move_cheap uses
         # for candidates. This removes the spurious −β·lcs/N bonus that arises
@@ -163,7 +158,7 @@ class RealitySimulation:
             + self.gamma * U
             - self.vacuum * self.state.node_count
             - self.connectivity * lcs_fraction
-            + self.size_penalty * self.state.node_count ** 2
+            + self.size_penalty * self.state.node_count**2
             + topo_term
         )
 
@@ -173,9 +168,17 @@ class RealitySimulation:
 
         for i, move in enumerate(moves):
             score, ns = score_move_cheap(
-                self.state, move, E_scoring,
-                self.alpha, self.beta, self.gamma, self.vacuum, self.connectivity,
-                C, lcs, U,
+                self.state,
+                move,
+                E_scoring,
+                self.alpha,
+                self.beta,
+                self.gamma,
+                self.vacuum,
+                self.connectivity,
+                C,
+                lcs,
+                U,
                 self.size_penalty,
                 self.topology_reward,
             )
@@ -184,10 +187,7 @@ class RealitySimulation:
                 candidate_states[i] = ns
 
         total = sum(scores)
-        probs = (
-            [s / total for s in scores] if total > 0
-            else [1.0 / len(scores)] * len(scores)
-        )
+        probs = [s / total for s in scores] if total > 0 else [1.0 / len(scores)] * len(scores)
 
         chosen_idx = int(np.random.choice(len(moves), p=probs))
         chosen = moves[chosen_idx]
@@ -212,9 +212,7 @@ class RealitySimulation:
             "I": I,
             "U": U,
             "move_type": chosen[0],
-            "complexity_bytes": len(
-                zlib.compress(serialize_state(self.state), level=9)
-            ),
+            "complexity_bytes": len(zlib.compress(serialize_state(self.state), level=9)),
             "curvature_mean": float(np.mean(curvs)),
             "curvature_std": float(np.std(curvs)),
             "curvature_max": float(np.max(np.abs(curvs))),
@@ -233,9 +231,11 @@ class RealitySimulation:
             print("  RELATE — Relational Evolutionary Lattice")
             print("           for Algorithmic Time and Experience")
             print(f"  α={self.alpha}, β={self.beta}, γ={self.gamma}")
-            print(f"  vacuum={self.vacuum}, connectivity={self.connectivity}, "
-                  f"size_penalty={self.size_penalty}, "
-                  f"topology_reward={self.topology_reward}")
+            print(
+                f"  vacuum={self.vacuum}, connectivity={self.connectivity}, "
+                f"size_penalty={self.size_penalty}, "
+                f"topology_reward={self.topology_reward}"
+            )
             print(f"{'=' * 70}\n")
 
         for i in range(steps):
@@ -278,8 +278,10 @@ class RealitySimulation:
         print("\nCurvature ripple:")
         print(f"  Max amplitude:  {max(r['curvature_max'] for r in h):.4e}")
         print(f"  Mean std dev:   {np.mean([r['curvature_std'] for r in h]):.4e}")
-        print(f"  INTEGRATE events (particle births): "
-              f"{sum(1 for r in h if r['move_type'] == 'integrate')}")
+        print(
+            f"  INTEGRATE events (particle births): "
+            f"{sum(1 for r in h if r['move_type'] == 'integrate')}"
+        )
         print("\nInformation:")
         print(f"  Final I(G):     {h[-1]['I']:.4f}")
         print(f"  Accumulated U:  {h[-1]['U']:.1f} bytes")

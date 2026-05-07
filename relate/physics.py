@@ -92,9 +92,7 @@ def compute_integrated_info(state: RealityState) -> float:
         lambda_2 = eigenvalues[1] if len(eigenvalues) > 1 else 0.0
 
         probs = np.abs(eigenvalues) / (np.sum(np.abs(eigenvalues)) + 1e-10)
-        spectral_entropy = (
-            -np.sum(probs * np.log(probs + 1e-10)) / np.log(len(eigenvalues) + 1)
-        )
+        spectral_entropy = -np.sum(probs * np.log(probs + 1e-10)) / np.log(len(eigenvalues) + 1)
 
         return float(lambda_2 * (1.0 + spectral_entropy))
     except (np.linalg.LinAlgError, ValueError, ArpackNoConvergence):

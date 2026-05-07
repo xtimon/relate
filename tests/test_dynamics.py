@@ -5,7 +5,6 @@ Covers: all six move types, edge cases, scoring correctness,
         and the Boltzmann selection mechanism.
 """
 
-
 import networkx as nx
 import numpy as np
 import pytest
@@ -22,6 +21,7 @@ from relate.physics import (
 from relate.state import RealityState
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def empty_state():
@@ -71,6 +71,7 @@ def complex_state():
 
 
 # ── generate_moves ────────────────────────────────────────────────────────────
+
 
 class TestGenerateMoves:
     """Default move generation for a simulation step."""
@@ -199,6 +200,7 @@ class TestGenerateMoves:
 
 # ── apply_move ────────────────────────────────────────────────────────────────
 
+
 class TestApplyMove:
     """Move application produces correct new states."""
 
@@ -275,8 +277,7 @@ class TestApplyMove:
     def test_deflate_removes_isolated_node(self, complex_state):
         """Deflate removes an isolated (degree-0) node."""
         # Find an isolated node
-        isolated = [n for n in complex_state.graph.nodes()
-                    if complex_state.graph.degree(n) == 0][0]
+        isolated = [n for n in complex_state.graph.nodes() if complex_state.graph.degree(n) == 0][0]
         move = ("deflate", (isolated,), 1.0)
         new_state = apply_move(complex_state, move)
         assert isolated not in new_state.graph
@@ -366,31 +367,43 @@ class TestApplyMove:
 
 # ── score_move_cheap ──────────────────────────────────────────────────────────
 
+
 class TestScoreMoveCheap:
     """Boltzmann scoring of moves using cheap energy approximation."""
 
     def _default_params(self):
         return {
-            "alpha": 0.3, "beta": 3.0, "gamma": 0.02,
-            "vacuum": 0.8, "connectivity": 3.0,
-            "size_penalty": 0.004, "topology_reward": 0.0,
+            "alpha": 0.3,
+            "beta": 3.0,
+            "gamma": 0.02,
+            "vacuum": 0.8,
+            "connectivity": 3.0,
+            "size_penalty": 0.004,
+            "topology_reward": 0.0,
         }
 
     def _score(self, state, move, E=0.0, C=0.0, lcs=0, U=0.0, **overrides):
         params = self._default_params()
         params.update(overrides)
         return score_move_cheap(
-            state, move, E,
-            params["alpha"], params["beta"], params["gamma"],
-            params["vacuum"], params["connectivity"],
-            C, lcs, U,
-            params["size_penalty"], params["topology_reward"],
+            state,
+            move,
+            E,
+            params["alpha"],
+            params["beta"],
+            params["gamma"],
+            params["vacuum"],
+            params["connectivity"],
+            C,
+            lcs,
+            U,
+            params["size_penalty"],
+            params["topology_reward"],
         )
 
     def test_deflate_returns_score_and_none(self, complex_state):
         """Deflate returns (score, None) — no graph copy needed."""
-        isolated = [n for n in complex_state.graph.nodes()
-                    if complex_state.graph.degree(n) == 0][0]
+        isolated = [n for n in complex_state.graph.nodes() if complex_state.graph.degree(n) == 0][0]
         move = ("deflate", (isolated,), 1.0)
         score, ns = self._score(complex_state, move, C=1.0, lcs=3, U=5.0)
         assert isinstance(score, float)
@@ -469,13 +482,9 @@ class TestScoreMoveCheap:
         move = ("triangulate", (a, c), 1.0)
 
         # Without topology_reward
-        score_no_reward, _ = self._score(
-            state, move, C=0.0, lcs=3, U=0.0, topology_reward=0.0
-        )
+        score_no_reward, _ = self._score(state, move, C=0.0, lcs=3, U=0.0, topology_reward=0.0)
         # With topology_reward
-        score_with_reward, _ = self._score(
-            state, move, C=0.0, lcs=3, U=0.0, topology_reward=5.0
-        )
+        score_with_reward, _ = self._score(state, move, C=0.0, lcs=3, U=0.0, topology_reward=5.0)
         # topology_reward lowers energy → higher score
         assert score_with_reward > score_no_reward
 
@@ -488,9 +497,7 @@ class TestScoreMoveCheap:
             two_node_state, move, C=0.0, lcs=2, U=0.0, size_penalty=0.001
         )
         # With large size_penalty
-        score_high_pen, _ = self._score(
-            two_node_state, move, C=0.0, lcs=2, U=0.0, size_penalty=0.1
-        )
+        score_high_pen, _ = self._score(two_node_state, move, C=0.0, lcs=2, U=0.0, size_penalty=0.1)
         # Higher size_penalty → higher energy → lower score
         assert score_high_pen < score_low_pen
 
@@ -588,6 +595,7 @@ class TestScoreMoveCheap:
 
 # ── Integration: generate → score → apply ─────────────────────────────────────
 
+
 class TestMoveLifecycle:
     """End-to-end: generate moves, score them, apply the best one."""
 
@@ -607,10 +615,19 @@ class TestMoveLifecycle:
 
         for move in moves:
             score, candidate = score_move_cheap(
-                triangle_state, move, E,
-                0.3, 3.0, 0.02, 0.8, 3.0,
-                C, lcs, 0.0,
-                0.004, 0.0,
+                triangle_state,
+                move,
+                E,
+                0.3,
+                3.0,
+                0.02,
+                0.8,
+                3.0,
+                C,
+                lcs,
+                0.0,
+                0.004,
+                0.0,
             )
             if score > best_score:
                 best_score = score
@@ -639,10 +656,19 @@ class TestMoveLifecycle:
         scores = []
         for move in moves:
             score, _ = score_move_cheap(
-                triangle_state, move, E,
-                0.3, 3.0, 0.02, 0.8, 3.0,
-                C, lcs, 0.0,
-                0.004, 0.0,
+                triangle_state,
+                move,
+                E,
+                0.3,
+                3.0,
+                0.02,
+                0.8,
+                3.0,
+                C,
+                lcs,
+                0.0,
+                0.004,
+                0.0,
             )
             scores.append(score)
 
@@ -660,10 +686,19 @@ class TestMoveLifecycle:
         candidates = {}
         for i, move in enumerate(moves):
             score, ns = score_move_cheap(
-                triangle_state, move, E,
-                0.3, 3.0, 0.02, 0.8, 3.0,
-                C, lcs, 0.0,
-                0.004, 0.0,
+                triangle_state,
+                move,
+                E,
+                0.3,
+                3.0,
+                0.02,
+                0.8,
+                3.0,
+                C,
+                lcs,
+                0.0,
+                0.004,
+                0.0,
             )
             scores.append(score)
             if ns is not None:

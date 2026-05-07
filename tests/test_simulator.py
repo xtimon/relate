@@ -18,6 +18,7 @@ from relate.state import RealityState
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(autouse=True)
 def seeded_random():
     """All simulator tests use deterministic randomness."""
@@ -27,6 +28,7 @@ def seeded_random():
 
 
 # ── Initialization ────────────────────────────────────────────────────────────
+
 
 class TestInitialization:
     """RealitySimulation construction and default state."""
@@ -42,9 +44,13 @@ class TestInitialization:
     def test_parameters_are_stored(self):
         """Constructor parameters are stored as attributes."""
         sim = RealitySimulation(
-            alpha=0.5, beta=5.0, gamma=0.1,
-            vacuum=1.0, connectivity=2.0,
-            size_penalty=0.01, topology_reward=3.0,
+            alpha=0.5,
+            beta=5.0,
+            gamma=0.1,
+            vacuum=1.0,
+            connectivity=2.0,
+            size_penalty=0.01,
+            topology_reward=3.0,
             i_update_interval=10,
         )
         assert sim.alpha == 0.5
@@ -89,6 +95,7 @@ class TestInitialization:
 
     def test_custom_move_generator(self):
         """Custom move generator is used instead of default."""
+
         def my_moves(state):
             return [("seed", (), 1.0)]
 
@@ -108,6 +115,7 @@ class TestInitialization:
 
 
 # ── Single Step ───────────────────────────────────────────────────────────────
+
 
 class TestStep:
     """RealitySimulation.step() advances the simulation by one step."""
@@ -130,9 +138,19 @@ class TestStep:
         sim = RealitySimulation(record_all_states=False)
         record = sim.step()
         expected_keys = {
-            "time", "nodes", "edges", "triples", "largest_component",
-            "C", "I", "U", "move_type", "complexity_bytes",
-            "curvature_mean", "curvature_std", "curvature_max",
+            "time",
+            "nodes",
+            "edges",
+            "triples",
+            "largest_component",
+            "C",
+            "I",
+            "U",
+            "move_type",
+            "complexity_bytes",
+            "curvature_mean",
+            "curvature_std",
+            "curvature_max",
         }
         assert expected_keys.issubset(record.keys())
 
@@ -220,6 +238,7 @@ class TestStep:
 
 # ── Batch Run ─────────────────────────────────────────────────────────────────
 
+
 class TestRun:
     """RealitySimulation.run() runs multiple steps."""
 
@@ -263,9 +282,7 @@ class TestRun:
 
     def test_run_with_topology_reward(self):
         """Running with topology_reward produces valid results."""
-        sim = RealitySimulation(
-            topology_reward=3.5, record_all_states=False
-        )
+        sim = RealitySimulation(topology_reward=3.5, record_all_states=False)
         history = sim.run(steps=30, verbose=False)
         assert len(history) == 30
         # Should have some triangulate moves
@@ -305,6 +322,7 @@ class TestRun:
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
+
 class TestSummary:
     """RealitySimulation.summary() output."""
 
@@ -338,6 +356,7 @@ class TestSummary:
 
 # ── Custom Move Generators ────────────────────────────────────────────────────
 
+
 class TestCustomMoveGenerator:
     """Custom move generators can extend the simulation."""
 
@@ -356,6 +375,7 @@ class TestCustomMoveGenerator:
 
     def test_custom_generator_only_seed(self):
         """Generator that only returns seed moves works."""
+
         def only_seed(state):
             return [("seed", (), 1.0)]
 
@@ -368,6 +388,7 @@ class TestCustomMoveGenerator:
 
     def test_custom_generator_only_deflate(self):
         """Generator that only returns deflate on isolated nodes."""
+
         def only_deflate(state):
             moves = []
             for node in state.graph.nodes():
@@ -385,6 +406,7 @@ class TestCustomMoveGenerator:
 
 
 # ── Initial States ────────────────────────────────────────────────────────────
+
 
 class TestInitialStates:
     """Simulation can start from different initial topologies."""
@@ -440,6 +462,7 @@ class TestInitialStates:
 
 
 # ── Edge Cases ────────────────────────────────────────────────────────────────
+
 
 class TestEdgeCases:
     """Edge cases and error handling."""

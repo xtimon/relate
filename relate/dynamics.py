@@ -34,6 +34,7 @@ Move = tuple[str, tuple, float]
 #  Move generation                                                     #
 # ------------------------------------------------------------------ #
 
+
 def generate_moves(state: RealityState) -> list[Move]:
     """Default move set for a simulation step."""
     moves: list[Move] = []
@@ -67,9 +68,7 @@ def generate_moves(state: RealityState) -> list[Move]:
     # Sample nodes, collect non-adjacent neighbour pairs, pick up to 8.
     if state.node_count >= 3:
         open_pairs: list[tuple[int, int]] = []
-        sample_nodes = random.sample(
-            list(state.graph.nodes()), min(20, state.node_count)
-        )
+        sample_nodes = random.sample(list(state.graph.nodes()), min(20, state.node_count))
         for w in sample_nodes:
             nbs = list(state.graph.neighbors(w))
             for i in range(len(nbs)):
@@ -92,6 +91,7 @@ def generate_moves(state: RealityState) -> list[Move]:
 #  Move application                                                    #
 # ------------------------------------------------------------------ #
 
+
 def apply_move(state: RealityState, move: Move) -> RealityState:
     """
     Apply *move* to *state* and return the resulting new state.
@@ -109,9 +109,7 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
             ns.add_edge(w, u, weight=1.0)
             ns.add_edge(w, v, weight=1.0)
             if ns.graph.has_edge(u, v):
-                ns.graph[u][v]["weight"] = min(
-                    3.0, ns.graph[u][v].get("weight", 1.0) * 1.05
-                )
+                ns.graph[u][v]["weight"] = min(3.0, ns.graph[u][v].get("weight", 1.0) * 1.05)
 
     elif move_type == "integrate":
         u, v, w = args
@@ -157,6 +155,7 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
 # ------------------------------------------------------------------ #
 #  Cheap scoring (used by RealitySimulation.step)                      #
 # ------------------------------------------------------------------ #
+
 
 def score_move_cheap(
     state: RealityState,
@@ -213,7 +212,7 @@ def score_move_cheap(
             + gamma * U
             - vacuum * ns_N
             - connectivity * (ns_lcs / max(1, ns_N))
-            + size_penalty * ns_N ** 2
+            + size_penalty * ns_N**2
             - topology_reward * ns_T / max(1, ns_N)
         )
         return float(priority * np.exp(-(ns_E - E)))
@@ -245,6 +244,5 @@ def score_move_cheap(
     else:  # expand / integrate: topology changes require a graph copy
         ns = apply_move(state, move)
         ns_C = compute_curvature(ns)
-        score = _score(ns_C, ns.largest_component_size(), ns.node_count,
-                       ns.triple_count)
+        score = _score(ns_C, ns.largest_component_size(), ns.node_count, ns.triple_count)
         return score, ns

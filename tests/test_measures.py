@@ -27,6 +27,7 @@ from relate.state import RealityState
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def empty_state():
     return RealityState()
@@ -100,6 +101,7 @@ def sample_history():
 
 # ── _largest_component (internal helper) ──────────────────────────────────────
 
+
 class TestLargestComponent:
     """Internal helper for extracting the largest connected component."""
 
@@ -138,6 +140,7 @@ class TestLargestComponent:
 
 
 # ── spectral_dimension ────────────────────────────────────────────────────────
+
 
 class TestSpectralDimension:
     """Estimate of spectral dimension d_s via return probability."""
@@ -209,6 +212,7 @@ class TestSpectralDimension:
 
 # ── ricci_curvature_distribution ──────────────────────────────────────────────
 
+
 class TestRicciCurvatureDistribution:
     """Summary statistics of the Regge curvature field."""
 
@@ -243,6 +247,7 @@ class TestRicciCurvatureDistribution:
 
 # ── degree_distribution ───────────────────────────────────────────────────────
 
+
 class TestDegreeDistribution:
     """Degree histogram."""
 
@@ -276,6 +281,7 @@ class TestDegreeDistribution:
 
 
 # ── power_law_exponent ────────────────────────────────────────────────────────
+
 
 class TestPowerLawExponent:
     """Hill estimator for power-law exponent γ."""
@@ -340,6 +346,7 @@ class TestPowerLawExponent:
 
 # ── small_world_metrics ───────────────────────────────────────────────────────
 
+
 class TestSmallWorldMetrics:
     """Clustering, path length, and small-world index ω."""
 
@@ -392,6 +399,7 @@ class TestSmallWorldMetrics:
 
 # ── complexity_slope ──────────────────────────────────────────────────────────
 
+
 class TestComplexitySlope:
     """Linear slope dU/dt over a window."""
 
@@ -424,6 +432,7 @@ class TestComplexitySlope:
 
 
 # ── integrate_event_analysis ──────────────────────────────────────────────────
+
 
 class TestIntegrateEventAnalysis:
     """Statistics about particle-birth events."""
@@ -469,6 +478,7 @@ class TestIntegrateEventAnalysis:
 
 # ── monotonicity_score ────────────────────────────────────────────────────────
 
+
 class TestMonotonicityScore:
     """Fraction of steps where a quantity never decreases."""
 
@@ -494,7 +504,8 @@ class TestMonotonicityScore:
     def test_mixed(self):
         """Mixed increases and decreases returns fraction."""
         history = [
-            {"U": 0}, {"U": 5},  # increase
+            {"U": 0},
+            {"U": 5},  # increase
             {"U": 3},  # decrease
             {"U": 8},  # increase
             {"U": 8},  # equal (counts as non-decrease)
@@ -518,6 +529,7 @@ class TestMonotonicityScore:
 
 
 # ── network_summary ───────────────────────────────────────────────────────────
+
 
 class TestNetworkSummary:
     """All structural metrics in a single dict."""
@@ -567,7 +579,14 @@ class TestNetworkSummary:
         """Returns a dict with expected keys."""
         ns = network_summary(triangle_state)
         expected_keys = {
-            "nodes", "edges", "triangles", "avg_degree", "density",
-            "n_components", "lcs_fraction", "clustering", "power_law_gamma",
+            "nodes",
+            "edges",
+            "triangles",
+            "avg_degree",
+            "density",
+            "n_components",
+            "lcs_fraction",
+            "clustering",
+            "power_law_gamma",
         }
         assert set(ns.keys()) == expected_keys
