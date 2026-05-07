@@ -44,7 +44,7 @@ moves:
 |---|---|---|
 | **expand** | Cuts a string in half and adds a new dot in the middle | `o──o`  →  `o─o─o` |
 | **integrate** | Squishes a triangle into a single dot (a "particle") | `△` → `●` |
-| **seed** | A pair of dots pops out of nowhere (like a bubble) | _nothing_ → `o──o` |
+| **seed** | A pair of dots pops out and attaches to the main graph | _nothing_ → `o──o─▣` |
 | **deflate** | Removes a lonely dot that has no friends | `o` → _gone_ |
 | **connect** | Draws a string between two big lonely chunks | `▣  ▣` → `▣──▣` |
 | **triangulate** | Closes an open shape into a triangle (ΔN=0, ΔT≥1) | `o─o─o` → `△` |

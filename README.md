@@ -43,7 +43,7 @@ E = α·C − β·I + γ·U − vacuum·N − connectivity·(LCS/N) + size_penal
 |---|---|---|---|
 | `expand` | Subdivide edge (u,v) → insert node w | +1 | +1 |
 | `integrate` | Collapse triangle → single particle node | −2 | variable |
-| `seed` | Vacuum fluctuation: add disconnected pair | +2 | 0 |
+| `seed` | Vacuum fluctuation: add node pair attached to main graph | +2 | 0 |
 | `deflate` | Remove isolated node | −1 | 0 |
 | `connect` | Bridge two largest components | 0 | 0 |
 | `triangulate` | Close open triangle (ΔN=0, ΔT≥1) | 0 | +k |

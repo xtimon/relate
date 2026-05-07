@@ -7,7 +7,7 @@ Six built-in move types are provided:
     expand      — subdivide an edge by inserting a new node
     integrate   — collapse a triangle into a single particle node
     deflate     — remove an isolated (degree-0) node
-    seed        — vacuum fluctuation: add a disconnected node pair
+    seed        — vacuum fluctuation: add a node pair attached to the main graph
     connect     — bridge the two largest components with a weak edge
     triangulate — close an open triangle (add edge between two non-adjacent
                   nodes that share a common neighbour).  ΔN=0, ΔT≥1.
@@ -188,6 +188,13 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
         a = ns.add_node()
         b = ns.add_node()
         ns.add_edge(a, b, weight=_DEFAULT_EDGE_WEIGHT)
+        # Encapsulate the seed pair in the main graph so they don't form a
+        # persistent isolated component (degree-1 nodes are not eligible for
+        # deflate).  Attach one of the new nodes to a random existing node.
+        existing = [n for n in ns.graph.nodes() if n not in (a, b)]
+        if existing:
+            anchor = random.choice(existing)
+            ns.add_edge(a, anchor, weight=_DEFAULT_EDGE_WEIGHT)
 
     elif move_type == "connect":
         u, v = args
@@ -273,8 +280,9 @@ def score_move_cheap(
         return _score(C, lcs, N - 1, T), None
 
     elif move_type == "seed":
-        # Two fresh nodes + one edge: no new triangles.
-        return _score(C, max(lcs, 2), N + 2, T), None
+        # Two fresh nodes + two edges (pair + anchor): no new triangles.
+        # The new nodes join the main component, so LCS increases by 2.
+        return _score(C, lcs + 2, N + 2, T), None
 
     elif move_type == "connect":
         # Cross-component edge: endpoints share no neighbours → no new triangles.

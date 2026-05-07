@@ -27,7 +27,7 @@ Six move types are available:
     expand      — subdivide an edge by inserting a new node (ΔN=+1, ΔE=+2)
     integrate   — collapse a triangle into a single particle node (ΔN=−2)
     deflate     — remove an isolated (degree-0) node (ΔN=−1)
-    seed        — vacuum fluctuation: add a disconnected node pair (ΔN=+2)
+    seed        — vacuum fluctuation: add a node pair attached to the main graph (ΔN=+2)
     connect     — bridge two components with a weak edge (ΔN=0)
     triangulate — close an open triangle (ΔN=0, ΔT≥1)
 """
