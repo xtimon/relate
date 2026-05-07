@@ -14,6 +14,24 @@ from scipy.sparse.linalg import ArpackNoConvergence, eigs
 
 from .state import RealityState
 
+# ── Numerical tolerances ───────────────────────────────────────────────────────
+_CURVATURE_EPS: float = 1e-6
+"""Small constant to avoid division by zero in curvature calculations."""
+
+_NORMALISATION_EPS: float = 1e-10
+"""Small constant to avoid log(0) in spectral entropy."""
+
+# ── Spectral dimension / integrated-info thresholds ────────────────────────────
+_EIGENVALUE_FULL_THRESHOLD: int = 10
+"""Below this node count, compute all eigenvalues exactly; above, use sparse eigs."""
+
+_EIGENVALUE_K: int = 3
+"""Number of smallest eigenvalues to request from the sparse solver."""
+
+# ── Compression ────────────────────────────────────────────────────────────────
+_ZLIB_LEVEL: int = 9
+"""Compression level for zlib (9 = maximum)."""
+
 
 def compute_local_curvature_field(state: RealityState) -> dict[int, float]:
     """
@@ -25,21 +43,32 @@ def compute_local_curvature_field(state: RealityState) -> dict[int, float]:
     as inverse distances, so w_ij → length a_ij = 1 / w_ij.
     """
     local_curvature: dict[int, float] = defaultdict(float)
-    eps = 1e-6
 
     for u, v, n_w in state.triples:
         w_uv = state.graph[u][v].get("weight", 1.0)
         w_vw = state.graph[v][n_w].get("weight", 1.0)
         w_wu = state.graph[n_w][u].get("weight", 1.0)
 
-        a = 1.0 / (w_vw + eps)
-        b = 1.0 / (w_wu + eps)
-        c = 1.0 / (w_uv + eps)
+        a = 1.0 / (w_vw + _CURVATURE_EPS)
+        b = 1.0 / (w_wu + _CURVATURE_EPS)
+        c = 1.0 / (w_uv + _CURVATURE_EPS)
 
         try:
-            cos_A = np.clip((b**2 + c**2 - a**2) / (2 * b * c + eps), -1 + eps, 1 - eps)
-            cos_B = np.clip((a**2 + c**2 - b**2) / (2 * a * c + eps), -1 + eps, 1 - eps)
-            cos_C = np.clip((a**2 + b**2 - c**2) / (2 * a * b + eps), -1 + eps, 1 - eps)
+            cos_A = np.clip(
+                (b**2 + c**2 - a**2) / (2 * b * c + _CURVATURE_EPS),
+                -1 + _CURVATURE_EPS,
+                1 - _CURVATURE_EPS,
+            )
+            cos_B = np.clip(
+                (a**2 + c**2 - b**2) / (2 * a * c + _CURVATURE_EPS),
+                -1 + _CURVATURE_EPS,
+                1 - _CURVATURE_EPS,
+            )
+            cos_C = np.clip(
+                (a**2 + b**2 - c**2) / (2 * a * b + _CURVATURE_EPS),
+                -1 + _CURVATURE_EPS,
+                1 - _CURVATURE_EPS,
+            )
 
             deficit = np.arccos(cos_A) + np.arccos(cos_B) + np.arccos(cos_C) - np.pi
             local_curvature[u] += deficit / 3.0
@@ -82,17 +111,19 @@ def compute_integrated_info(state: RealityState) -> float:
             L = nx.normalized_laplacian_matrix(subgraph)
             n = len(subgraph)
 
-        if n <= 10:
+        if n <= _EIGENVALUE_FULL_THRESHOLD:
             eigenvalues = np.linalg.eigvalsh(L.toarray())
         else:
-            k = min(3, n - 1)
+            k = min(_EIGENVALUE_K, n - 1)
             eigenvalues = eigs(L, k=k, which="SM", return_eigenvectors=False)
             eigenvalues = np.sort(np.abs(eigenvalues))
 
         lambda_2 = eigenvalues[1] if len(eigenvalues) > 1 else 0.0
 
-        probs = np.abs(eigenvalues) / (np.sum(np.abs(eigenvalues)) + 1e-10)
-        spectral_entropy = -np.sum(probs * np.log(probs + 1e-10)) / np.log(len(eigenvalues) + 1)
+        probs = np.abs(eigenvalues) / (np.sum(np.abs(eigenvalues)) + _NORMALISATION_EPS)
+        spectral_entropy = -np.sum(probs * np.log(probs + _NORMALISATION_EPS)) / np.log(
+            len(eigenvalues) + 1
+        )
 
         return float(lambda_2 * (1.0 + spectral_entropy))
     except (np.linalg.LinAlgError, ValueError, ArpackNoConvergence):
@@ -118,4 +149,4 @@ def compute_accumulated_complexity(state: RealityState, initial_serialized: byte
     if state.node_count == 0:
         return 0.0
     current = serialize_state(state)
-    return max(0, len(zlib.compress(current, level=9)) - len(initial_serialized))
+    return max(0, len(zlib.compress(current, level=_ZLIB_LEVEL)) - len(initial_serialized))

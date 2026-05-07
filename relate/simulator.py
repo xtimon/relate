@@ -30,6 +30,7 @@ import numpy as np
 
 from .dynamics import apply_move, generate_moves, score_move_cheap
 from .physics import (
+    _ZLIB_LEVEL,
     compute_accumulated_complexity,
     compute_curvature,
     compute_integrated_info,
@@ -212,7 +213,7 @@ class RealitySimulation:
             "I": I,
             "U": U,
             "move_type": chosen[0],
-            "complexity_bytes": len(zlib.compress(serialize_state(self.state), level=9)),
+            "complexity_bytes": len(zlib.compress(serialize_state(self.state), level=_ZLIB_LEVEL)),
             "curvature_mean": float(np.mean(curvs)),
             "curvature_std": float(np.std(curvs)),
             "curvature_max": float(np.max(np.abs(curvs))),

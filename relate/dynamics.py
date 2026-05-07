@@ -29,6 +29,52 @@ from .state import RealityState
 
 Move = tuple[str, tuple, float]
 
+# ── Sampling budgets (move generation) ────────────────────────────────────────
+_EXPAND_SAMPLE_SIZE: int = 15
+"""Maximum number of edges sampled for expand moves per step."""
+
+_INTEGRATE_SAMPLE_SIZE: int = 10
+"""Maximum number of triangles sampled for integrate moves per step."""
+
+_TRIANGULATE_NODE_SAMPLE: int = 20
+"""Number of nodes sampled when searching for open triangles."""
+
+_TRIANGULATE_PAIR_LIMIT: int = 30
+"""Stop searching for open-triangle pairs after finding this many."""
+
+_TRIANGULATE_MOVE_LIMIT: int = 8
+"""Maximum triangulate moves generated per step."""
+
+# ── Move priorities ───────────────────────────────────────────────────────────
+_CONNECT_PRIORITY: float = 3.0
+"""Priority weight for connect moves (higher = more likely to be selected)."""
+
+_TRIANGULATE_PRIORITY: float = 2.0
+"""Priority weight for triangulate moves."""
+
+_DEFAULT_PRIORITY: float = 1.0
+"""Default priority for expand, integrate, deflate, and seed moves."""
+
+# ── Edge weights for move application ─────────────────────────────────────────
+_EXPAND_WEIGHT_CAP: float = 3.0
+"""Maximum weight an edge can reach through repeated expand moves."""
+
+_EXPAND_WEIGHT_MULTIPLIER: float = 1.05
+"""Per-expand multiplicative increase of the subdivided edge's weight."""
+
+_CONNECT_WEIGHT: float = 0.3
+"""Weight assigned to a newly bridged connect edge (weak link)."""
+
+_DEFAULT_EDGE_WEIGHT: float = 1.0
+"""Default weight for new edges (expand, seed, triangulate)."""
+
+# ── Minimum node counts for move eligibility ──────────────────────────────────
+_MIN_NODES_FOR_CONNECT: int = 4
+"""Graph must have at least this many nodes before connect moves are generated."""
+
+_MIN_NODES_FOR_TRIANGULATE: int = 3
+"""Graph must have at least this many nodes before triangulate moves are generated."""
+
 
 # ------------------------------------------------------------------ #
 #  Move generation                                                     #
@@ -41,34 +87,36 @@ def generate_moves(state: RealityState) -> list[Move]:
 
     if state.edge_count > 0:
         edges = list(state.graph.edges())
-        sample = random.sample(edges, min(15, len(edges)))
+        sample = random.sample(edges, min(_EXPAND_SAMPLE_SIZE, len(edges)))
         for u, v in sample:
-            moves.append(("expand", (u, v), 1.0))
+            moves.append(("expand", (u, v), _DEFAULT_PRIORITY))
 
     if state.triple_count > 0:
         triples = list(state.triples)
-        sample = random.sample(triples, min(10, len(triples)))
+        sample = random.sample(triples, min(_INTEGRATE_SAMPLE_SIZE, len(triples)))
         for t in sample:
-            moves.append(("integrate", t, 1.0))
+            moves.append(("integrate", t, _DEFAULT_PRIORITY))
 
     for node in state.graph.nodes():
         if state.graph.degree(node) == 0:
-            moves.append(("deflate", (node,), 1.0))
+            moves.append(("deflate", (node,), _DEFAULT_PRIORITY))
 
-    moves.append(("seed", (), 1.0))
+    moves.append(("seed", (), _DEFAULT_PRIORITY))
 
-    if state.node_count >= 4 and not nx.is_connected(state.graph):
+    if state.node_count >= _MIN_NODES_FOR_CONNECT and not nx.is_connected(state.graph):
         components = sorted(nx.connected_components(state.graph), key=len, reverse=True)
         if len(components) >= 2:
             c1, c2 = list(components[0]), list(components[1])
             if c1 and c2:
-                moves.append(("connect", (random.choice(c1), random.choice(c2)), 3.0))
+                moves.append(("connect", (random.choice(c1), random.choice(c2)), _CONNECT_PRIORITY))
 
     # TRIANGULATE: close an open triangle (ΔN=0, ΔT≥1).
     # Sample nodes, collect non-adjacent neighbour pairs, pick up to 8.
-    if state.node_count >= 3:
+    if state.node_count >= _MIN_NODES_FOR_TRIANGULATE:
         open_pairs: list[tuple[int, int]] = []
-        sample_nodes = random.sample(list(state.graph.nodes()), min(20, state.node_count))
+        sample_nodes = random.sample(
+            list(state.graph.nodes()), min(_TRIANGULATE_NODE_SAMPLE, state.node_count)
+        )
         for w in sample_nodes:
             nbs = list(state.graph.neighbors(w))
             for i in range(len(nbs)):
@@ -76,13 +124,13 @@ def generate_moves(state: RealityState) -> list[Move]:
                     u, v = nbs[i], nbs[j]
                     if not state.graph.has_edge(u, v):
                         open_pairs.append((u, v))
-                if len(open_pairs) >= 30:
+                if len(open_pairs) >= _TRIANGULATE_PAIR_LIMIT:
                     break
-            if len(open_pairs) >= 30:
+            if len(open_pairs) >= _TRIANGULATE_PAIR_LIMIT:
                 break
         if open_pairs:
-            for u, v in random.sample(open_pairs, min(8, len(open_pairs))):
-                moves.append(("triangulate", (u, v), 2.0))
+            for u, v in random.sample(open_pairs, min(_TRIANGULATE_MOVE_LIMIT, len(open_pairs))):
+                moves.append(("triangulate", (u, v), _TRIANGULATE_PRIORITY))
 
     return moves
 
@@ -106,10 +154,13 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
         u, v = args
         if u in ns.graph and v in ns.graph:
             w = ns.add_node()
-            ns.add_edge(w, u, weight=1.0)
-            ns.add_edge(w, v, weight=1.0)
+            ns.add_edge(w, u, weight=_DEFAULT_EDGE_WEIGHT)
+            ns.add_edge(w, v, weight=_DEFAULT_EDGE_WEIGHT)
             if ns.graph.has_edge(u, v):
-                ns.graph[u][v]["weight"] = min(3.0, ns.graph[u][v].get("weight", 1.0) * 1.05)
+                ns.graph[u][v]["weight"] = min(
+                    _EXPAND_WEIGHT_CAP,
+                    ns.graph[u][v].get("weight", _DEFAULT_EDGE_WEIGHT) * _EXPAND_WEIGHT_MULTIPLIER,
+                )
 
     elif move_type == "integrate":
         u, v, w = args
@@ -119,7 +170,7 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
             for node in (u, v, w):
                 for nb in state.graph.neighbors(node):
                     if nb not in (u, v, w):
-                        ext[nb] += state.graph[node][nb].get("weight", 1.0)
+                        ext[nb] += state.graph[node][nb].get("weight", _DEFAULT_EDGE_WEIGHT)
             for nb, tw in ext.items():
                 if nb in ns.graph:
                     ns.add_edge(particle, nb, weight=tw / 3.0)
@@ -136,17 +187,17 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
     elif move_type == "seed":
         a = ns.add_node()
         b = ns.add_node()
-        ns.add_edge(a, b, weight=1.0)
+        ns.add_edge(a, b, weight=_DEFAULT_EDGE_WEIGHT)
 
     elif move_type == "connect":
         u, v = args
         if u in ns.graph and v in ns.graph:
-            ns.add_edge(u, v, weight=0.3)
+            ns.add_edge(u, v, weight=_CONNECT_WEIGHT)
 
     elif move_type == "triangulate":
         u, v = args
         if u in ns.graph and v in ns.graph and not ns.graph.has_edge(u, v):
-            ns.add_edge(u, v, weight=1.0)
+            ns.add_edge(u, v, weight=_DEFAULT_EDGE_WEIGHT)
 
     ns.curvature_field = compute_local_curvature_field(ns)
     return ns
