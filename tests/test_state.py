@@ -4,9 +4,6 @@ Tests for relate.state — RealityState dataclass.
 Covers: node/edge CRUD, triangle tracking, cloning, convenience properties.
 """
 
-import networkx as nx
-import pytest
-
 from relate.state import RealityState
 
 

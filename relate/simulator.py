@@ -23,11 +23,12 @@ At each step the simulator:
 """
 
 import zlib
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Optional
 
 import numpy as np
 
-from .dynamics import Move, apply_move, generate_moves, score_move_cheap
+from .dynamics import apply_move, generate_moves, score_move_cheap
 from .physics import (
     compute_accumulated_complexity,
     compute_curvature,
@@ -93,7 +94,7 @@ class RealitySimulation:
         topology_reward: float = 0.0,
         i_update_interval: int = 1,
         initial_state: Optional["RealityState"] = None,
-        move_generator: Optional[Callable] = None,
+        move_generator: Callable | None = None,
         record_all_states: bool = True,
     ) -> None:
         self.alpha = alpha
@@ -119,8 +120,8 @@ class RealitySimulation:
         self.initial_serialized: bytes = serialize_state(self.state)
         self._cached_I: float = 0.0
         self._steps_since_I_update: int = self.i_update_interval  # force update on first step
-        self.history: List[Dict] = []
-        self.all_states: List[RealityState] = (
+        self.history: list[dict] = []
+        self.all_states: list[RealityState] = (
             [self.state.clone()] if record_all_states else []
         )
 
@@ -128,7 +129,7 @@ class RealitySimulation:
     # Single step
     # ------------------------------------------------------------------
 
-    def step(self) -> Dict:
+    def step(self) -> dict:
         """
         Advance the simulation by one time step.
 
@@ -153,16 +154,6 @@ class RealitySimulation:
             / max(1, self.state.node_count)
         )
 
-        E_exact = (
-            self.alpha * C
-            - self.beta * I
-            + self.gamma * U
-            - self.vacuum * self.state.node_count
-            - self.connectivity * lcs_fraction
-            + self.size_penalty * self.state.node_count ** 2
-            + topo_term
-        )
-
         # E_scoring uses the same lcs/N proxy for I that score_move_cheap uses
         # for candidates. This removes the spurious −β·lcs/N bonus that arises
         # when exact I → 0 at large N while the candidate proxy remains ≈ 0.9·β.
@@ -177,8 +168,8 @@ class RealitySimulation:
         )
 
         moves = self.move_generator(self.state)
-        scores: List[float] = []
-        candidate_states: Dict[int, RealityState] = {}
+        scores: list[float] = []
+        candidate_states: dict[int, RealityState] = {}
 
         for i, move in enumerate(moves):
             score, ns = score_move_cheap(
@@ -211,7 +202,7 @@ class RealitySimulation:
 
         curvs = list(self.state.curvature_field.values()) or [0.0]
 
-        record: Dict = {
+        record: dict = {
             "time": self.state.time,
             "nodes": self.state.node_count,
             "edges": self.state.edge_count,
@@ -235,12 +226,12 @@ class RealitySimulation:
     # Batch run
     # ------------------------------------------------------------------
 
-    def run(self, steps: int = 100, verbose: bool = True) -> List[Dict]:
+    def run(self, steps: int = 100, verbose: bool = True) -> list[dict]:
         """Run *steps* simulation steps, optionally printing progress."""
         if verbose:
             print(f"{'=' * 70}")
-            print(f"  RELATE — Relational Evolutionary Lattice")
-            print(f"           for Algorithmic Time and Experience")
+            print("  RELATE — Relational Evolutionary Lattice")
+            print("           for Algorithmic Time and Experience")
             print(f"  α={self.alpha}, β={self.beta}, γ={self.gamma}")
             print(f"  vacuum={self.vacuum}, connectivity={self.connectivity}, "
                   f"size_penalty={self.size_penalty}, "
@@ -275,7 +266,7 @@ class RealitySimulation:
         print(f"\n{'=' * 70}")
         print("SIMULATION RESULTS")
         print(f"{'=' * 70}")
-        print(f"Final state:")
+        print("Final state:")
         print(f"  Nodes:          {s.node_count}")
         print(f"  Edges:          {s.edge_count}")
         print(f"  Triangles:      {s.triple_count}")

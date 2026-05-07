@@ -20,7 +20,6 @@ Custom move generators can be passed to RealitySimulation via the
 
 import random
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
 
 import networkx as nx
 import numpy as np
@@ -28,16 +27,16 @@ import numpy as np
 from .physics import compute_curvature, compute_local_curvature_field
 from .state import RealityState
 
-Move = Tuple[str, tuple, float]
+Move = tuple[str, tuple, float]
 
 
 # ------------------------------------------------------------------ #
 #  Move generation                                                     #
 # ------------------------------------------------------------------ #
 
-def generate_moves(state: RealityState) -> List[Move]:
+def generate_moves(state: RealityState) -> list[Move]:
     """Default move set for a simulation step."""
-    moves: List[Move] = []
+    moves: list[Move] = []
 
     if state.edge_count > 0:
         edges = list(state.graph.edges())
@@ -67,7 +66,7 @@ def generate_moves(state: RealityState) -> List[Move]:
     # TRIANGULATE: close an open triangle (ΔN=0, ΔT≥1).
     # Sample nodes, collect non-adjacent neighbour pairs, pick up to 8.
     if state.node_count >= 3:
-        open_pairs: List[Tuple[int, int]] = []
+        open_pairs: list[tuple[int, int]] = []
         sample_nodes = random.sample(
             list(state.graph.nodes()), min(20, state.node_count)
         )
@@ -118,7 +117,7 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
         u, v, w = args
         if all(n in ns.graph for n in (u, v, w)):
             particle = ns.add_node()
-            ext: Dict[int, float] = defaultdict(float)
+            ext: dict[int, float] = defaultdict(float)
             for node in (u, v, w):
                 for nb in state.graph.neighbors(node):
                     if nb not in (u, v, w):
@@ -173,7 +172,7 @@ def score_move_cheap(
     U: float,
     size_penalty: float = 0.0,
     topology_reward: float = 0.0,
-) -> Tuple[float, Optional[RealityState]]:
+) -> tuple[float, RealityState | None]:
     """
     Boltzmann score exp(−ΔE) for *move* using a cheap energy approximation.
 

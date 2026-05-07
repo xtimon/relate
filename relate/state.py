@@ -1,6 +1,5 @@
 import copy
 from dataclasses import dataclass, field
-from typing import Dict, Set, Tuple
 
 import networkx as nx
 
@@ -17,8 +16,8 @@ class RealityState:
     """
 
     graph: nx.Graph = field(default_factory=nx.Graph)
-    triples: Set[Tuple[int, int, int]] = field(default_factory=set)
-    curvature_field: Dict[int, float] = field(default_factory=dict)
+    triples: set[tuple[int, int, int]] = field(default_factory=set)
+    curvature_field: dict[int, float] = field(default_factory=dict)
     time: int = 0
     _next_id: int = 0
 

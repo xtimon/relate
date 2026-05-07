@@ -5,9 +5,7 @@ Covers: curvature computation, integrated information, serialization,
         Kolmogorov complexity proxy.
 """
 
-import zlib
 
-import networkx as nx
 import numpy as np
 import pytest
 
@@ -19,7 +17,6 @@ from relate.physics import (
     serialize_state,
 )
 from relate.state import RealityState
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -371,7 +368,6 @@ class TestComputeAccumulatedComplexity:
         nodes = [larger_state.add_node() for _ in range(10)]
         for i in range(9):
             larger_state.add_edge(nodes[i], nodes[i + 1])
-        larger_ser = serialize_state(larger_state)
 
         # The larger state should have positive accumulated complexity
         # relative to the initial 2-node state

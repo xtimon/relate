@@ -16,8 +16,41 @@ dependencies = [
 
 [project.optional-dependencies]
 jupyter = ["ipython>=8.0"]
-dev     = ["pytest>=7.0", "ruff>=0.4"]
+dev     = ["pytest>=7.0", "pytest-cov>=4.0", "ruff>=0.4"]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["relate*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "S", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "N806", "N802", "E741", "SIM108", "N803"]
+"relate/*" = ["N806", "E741", "N803", "S311"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+no_implicit_optional = true

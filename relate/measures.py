@@ -6,13 +6,11 @@ They can be combined freely in experiment scripts.
 """
 
 from collections import Counter
-from typing import Dict, List, Optional, Tuple
 
 import networkx as nx
 import numpy as np
 
 from .state import RealityState
-
 
 # ------------------------------------------------------------------ #
 #  Geometry                                                            #
@@ -20,9 +18,9 @@ from .state import RealityState
 
 def spectral_dimension(
     state: RealityState,
-    t_values: Optional[np.ndarray] = None,
-    fit_range: Tuple[float, float] = (0.5, 15.0),
-) -> Tuple[float, np.ndarray, np.ndarray]:
+    t_values: np.ndarray | None = None,
+    fit_range: tuple[float, float] = (0.5, 15.0),
+) -> tuple[float, np.ndarray, np.ndarray]:
     """
     Estimate the spectral dimension d_s via the return probability of a
     random walk on the graph Laplacian.
@@ -68,7 +66,7 @@ def spectral_dimension(
     return d_s, t_values, p_values
 
 
-def ricci_curvature_distribution(state: RealityState) -> Dict[str, float]:
+def ricci_curvature_distribution(state: RealityState) -> dict[str, float]:
     """
     Summary statistics of the Regge angle-deficit curvature field.
 
@@ -93,7 +91,7 @@ def ricci_curvature_distribution(state: RealityState) -> Dict[str, float]:
 #  Network topology                                                    #
 # ------------------------------------------------------------------ #
 
-def degree_distribution(state: RealityState) -> Dict[int, int]:
+def degree_distribution(state: RealityState) -> dict[int, int]:
     """Return ``{degree: node_count}`` histogram."""
     return dict(Counter(d for _, d in state.graph.degree()))
 
@@ -116,7 +114,7 @@ def power_law_exponent(state: RealityState, k_min_percentile: float = 75.0) -> f
     return float(gamma)
 
 
-def small_world_metrics(state: RealityState) -> Dict[str, float]:
+def small_world_metrics(state: RealityState) -> dict[str, float]:
     """
     Clustering coefficient, average path length, and small-world index ω.
 
@@ -152,7 +150,7 @@ def small_world_metrics(state: RealityState) -> Dict[str, float]:
 #  Thermodynamics / information                                        #
 # ------------------------------------------------------------------ #
 
-def complexity_slope(history: List[Dict], window: int = 20) -> float:
+def complexity_slope(history: list[dict], window: int = 20) -> float:
     """
     Linear slope dU/dt estimated over the last *window* steps.
     Positive slope → complexity is still growing (second law satisfied).
@@ -165,7 +163,7 @@ def complexity_slope(history: List[Dict], window: int = 20) -> float:
     return float(slope)
 
 
-def integrate_event_analysis(history: List[Dict]) -> Dict:
+def integrate_event_analysis(history: list[dict]) -> dict:
     """
     Statistics about integrate (particle-birth) events: their timing,
     curvature amplitude at the moment they occur, and inter-event intervals.
@@ -186,7 +184,7 @@ def integrate_event_analysis(history: List[Dict]) -> Dict:
     }
 
 
-def monotonicity_score(history: List[Dict], key: str = "U") -> float:
+def monotonicity_score(history: list[dict], key: str = "U") -> float:
     """
     Fraction of consecutive steps where ``history[t][key] ≥ history[t-1][key]``.
     A value of 1.0 means the quantity never decreased (strict second law).
@@ -194,7 +192,7 @@ def monotonicity_score(history: List[Dict], key: str = "U") -> float:
     vals = [h[key] for h in history]
     if len(vals) < 2:
         return 1.0
-    increases = sum(1 for a, b in zip(vals, vals[1:]) if b >= a)
+    increases = sum(1 for a, b in zip(vals, vals[1:], strict=False) if b >= a)
     return increases / (len(vals) - 1)
 
 
@@ -202,7 +200,7 @@ def monotonicity_score(history: List[Dict], key: str = "U") -> float:
 #  Full summary                                                        #
 # ------------------------------------------------------------------ #
 
-def network_summary(state: RealityState) -> Dict:
+def network_summary(state: RealityState) -> dict:
     """All structural metrics in a single dict."""
     G = state.graph
     N = state.node_count

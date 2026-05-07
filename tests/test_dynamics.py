@@ -5,15 +5,12 @@ Covers: all six move types, edge cases, scoring correctness,
         and the Boltzmann selection mechanism.
 """
 
-import random
-from collections import Counter
 
 import networkx as nx
 import numpy as np
 import pytest
 
 from relate.dynamics import (
-    Move,
     apply_move,
     generate_moves,
     score_move_cheap,
@@ -21,10 +18,8 @@ from relate.dynamics import (
 from relate.physics import (
     compute_curvature,
     compute_local_curvature_field,
-    serialize_state,
 )
 from relate.state import RealityState
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

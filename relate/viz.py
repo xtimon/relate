@@ -5,7 +5,6 @@ Both functions use the 'dark_background' matplotlib style as a context so
 they never mutate the caller's global style settings.
 """
 
-from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -13,16 +12,15 @@ import numpy as np
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 from .simulator import RealitySimulation
-from .state import RealityState
 
 
 def create_perfect_animation(
     sim: RealitySimulation,
-    history: List[Dict],
+    history: list[dict],
     step: int = 1,
     fps: int = 5,
     filename: str = "quantum_breath.gif",
-) -> Tuple[FuncAnimation, str]:
+) -> tuple[FuncAnimation, str]:
     """
     Build a GIF animation from the states stored in ``sim.all_states``.
 
@@ -65,7 +63,7 @@ def create_perfect_animation(
         curv_max_hist = [h["curvature_max"] for h in history]
         curv_std_hist = [h["curvature_std"] for h in history]
 
-        current_pos: Optional[dict] = None
+        current_pos: dict | None = None
 
         def animate(frame_idx: int) -> list:
             nonlocal current_pos
@@ -155,7 +153,7 @@ def create_perfect_animation(
     return ani, filename
 
 
-def plot_final_universe(sim: RealitySimulation, history: List[Dict]) -> None:
+def plot_final_universe(sim: RealitySimulation, history: list[dict]) -> None:
     """
     Six-panel static summary figure for a completed simulation.
 

@@ -16,7 +16,6 @@ from relate.dynamics import generate_moves
 from relate.physics import compute_local_curvature_field
 from relate.state import RealityState
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
@@ -233,7 +232,6 @@ class TestRun:
 
     def test_run_specified_steps(self):
         """run() executes exactly the requested number of steps."""
-        sim = RealitySimulation(record_all_states=False)
         for n_steps in [1, 5, 20]:
             sim2 = RealitySimulation(record_all_states=False)
             history = sim2.run(steps=n_steps, verbose=False)
@@ -298,7 +296,7 @@ class TestRun:
         sim2 = RealitySimulation(record_all_states=False)
         h2 = sim2.run(steps=20, verbose=False)
 
-        for r1, r2 in zip(h1, h2):
+        for r1, r2 in zip(h1, h2, strict=True):
             assert r1["time"] == r2["time"]
             assert r1["nodes"] == r2["nodes"]
             assert r1["edges"] == r2["edges"]

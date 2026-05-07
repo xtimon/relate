@@ -25,7 +25,6 @@ from relate.measures import (
 from relate.physics import compute_local_curvature_field
 from relate.state import RealityState
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture

@@ -7,7 +7,6 @@ independently, making them easy to swap or extend in research experiments.
 
 import zlib
 from collections import defaultdict
-from typing import Dict
 
 import networkx as nx
 import numpy as np
@@ -16,7 +15,7 @@ from scipy.sparse.linalg import ArpackNoConvergence, eigs
 from .state import RealityState
 
 
-def compute_local_curvature_field(state: RealityState) -> Dict[int, float]:
+def compute_local_curvature_field(state: RealityState) -> dict[int, float]:
     """
     Regge-calculus angle-deficit curvature at each node.
 
@@ -25,7 +24,7 @@ def compute_local_curvature_field(state: RealityState) -> Dict[int, float]:
     is distributed equally among the three vertices. Edge weights are treated
     as inverse distances, so w_ij → length a_ij = 1 / w_ij.
     """
-    local_curvature: Dict[int, float] = defaultdict(float)
+    local_curvature: dict[int, float] = defaultdict(float)
     eps = 1e-6
 
     for u, v, n_w in state.triples:
