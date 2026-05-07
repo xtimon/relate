@@ -108,9 +108,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          sudo apt-get update && sudo apt-get install -y libgl1-mesa-glx  # for matplotlib
 
       - name: Run ${{ matrix.example }}
+        env:
+          MPLBACKEND: Agg
         run: |
           python examples/${{ matrix.example }}.py
         timeout-minutes: 10
