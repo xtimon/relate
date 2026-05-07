@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from relate.dynamics import (
+    MoveType,
     ScoringParams,
     apply_move,
     generate_moves,
@@ -81,17 +82,17 @@ class TestGenerateMoves:
         """Empty state generates only a seed move."""
         moves = generate_moves(empty_state)
         types = [m[0] for m in moves]
-        assert types == ["seed"]
+        assert types == [MoveType.SEED]
 
     def test_two_node_state(self, two_node_state):
         """Two-node state generates expand and seed moves."""
         moves = generate_moves(two_node_state)
         types = [m[0] for m in moves]
-        assert "expand" in types
-        assert "seed" in types
+        assert MoveType.EXPAND in types
+        assert MoveType.SEED in types
         # No integrate (no triangles), no deflate (no isolated nodes)
-        assert "integrate" not in types
-        assert "deflate" not in types
+        assert MoveType.INTEGRATE not in types
+        assert MoveType.DEFLATE not in types
 
     def test_triangle_state(self, triangle_state):
         """Triangle state generates expand, integrate, and seed.
@@ -99,9 +100,9 @@ class TestGenerateMoves:
         (all nodes are already pairwise connected)."""
         moves = generate_moves(triangle_state)
         types = [m[0] for m in moves]
-        assert "expand" in types
-        assert "integrate" in types
-        assert "seed" in types
+        assert MoveType.EXPAND in types
+        assert MoveType.INTEGRATE in types
+        assert MoveType.SEED in types
         # A complete triangle has no open pairs, so no triangulate moves
         # (all three nodes are already pairwise connected)
 
@@ -109,13 +110,13 @@ class TestGenerateMoves:
         """State with isolated nodes generates deflate moves."""
         moves = generate_moves(complex_state)
         types = [m[0] for m in moves]
-        assert "deflate" in types
+        assert MoveType.DEFLATE in types
 
     def test_connected_graph_no_connect(self, triangle_state):
         """Fully connected graph does not generate connect moves."""
         moves = generate_moves(triangle_state)
         types = [m[0] for m in moves]
-        assert "connect" not in types
+        assert MoveType.CONNECT not in types
 
     def test_disconnected_graph_generates_connect(self):
         """Disconnected graph generates connect moves."""
@@ -130,12 +131,12 @@ class TestGenerateMoves:
 
         moves = generate_moves(state)
         types = [m[0] for m in moves]
-        assert "connect" in types
+        assert MoveType.CONNECT in types
 
     def test_expand_samples_edges(self, two_node_state):
         """Expand moves sample from existing edges."""
         moves = generate_moves(two_node_state)
-        expand_moves = [m for m in moves if m[0] == "expand"]
+        expand_moves = [m for m in moves if m[0] is MoveType.EXPAND]
         assert len(expand_moves) >= 1
         for m in expand_moves:
             u, v = m[1]
@@ -144,7 +145,7 @@ class TestGenerateMoves:
     def test_integrate_samples_triangles(self, triangle_state):
         """Integrate moves sample from existing triangles."""
         moves = generate_moves(triangle_state)
-        integrate_moves = [m for m in moves if m[0] == "integrate"]
+        integrate_moves = [m for m in moves if m[0] is MoveType.INTEGRATE]
         assert len(integrate_moves) >= 1
         for m in integrate_moves:
             t = tuple(sorted(m[1]))
@@ -160,7 +161,7 @@ class TestGenerateMoves:
         state.curvature_field = compute_local_curvature_field(state)
 
         moves = generate_moves(state)
-        triangulate_moves = [m for m in moves if m[0] == "triangulate"]
+        triangulate_moves = [m for m in moves if m[0] is MoveType.TRIANGULATE]
         assert len(triangulate_moves) >= 1
         for m in triangulate_moves:
             u, v = m[1]
@@ -175,7 +176,7 @@ class TestGenerateMoves:
         for m in moves:
             assert isinstance(m, tuple)
             assert len(m) == 3
-            assert isinstance(m[0], str)
+            assert isinstance(m[0], MoveType)
             assert isinstance(m[1], tuple)
             assert isinstance(m[2], (int, float))
 
@@ -191,9 +192,9 @@ class TestGenerateMoves:
 
         moves = generate_moves(state)
         for m in moves:
-            if m[0] == "connect":
+            if m[0] is MoveType.CONNECT:
                 assert m[2] == 3.0
-            elif m[0] == "triangulate":
+            elif m[0] is MoveType.TRIANGULATE:
                 assert m[2] == 2.0
             else:
                 assert m[2] == 1.0
@@ -209,7 +210,7 @@ class TestApplyMove:
         """apply_move returns a new state; original is unchanged."""
         original_time = two_node_state.time
         original_n = two_node_state.node_count
-        move = ("expand", (0, 1), 1.0)
+        move = (MoveType.EXPAND, (0, 1), 1.0)
         new_state = apply_move(two_node_state, move)
         assert two_node_state.time == original_time
         assert two_node_state.node_count == original_n
@@ -217,7 +218,7 @@ class TestApplyMove:
 
     def test_expand_adds_node(self, two_node_state):
         """Expand subdivides an edge, adding one node and two edges."""
-        move = ("expand", (0, 1), 1.0)
+        move = (MoveType.EXPAND, (0, 1), 1.0)
         new_state = apply_move(two_node_state, move)
         assert new_state.node_count == two_node_state.node_count + 1
         assert new_state.edge_count == two_node_state.edge_count + 2
@@ -225,7 +226,7 @@ class TestApplyMove:
     def test_expand_increases_edge_weight(self, two_node_state):
         """Expand increases the weight of the subdivided edge by 5%."""
         original_weight = two_node_state.graph[0][1]["weight"]
-        move = ("expand", (0, 1), 1.0)
+        move = (MoveType.EXPAND, (0, 1), 1.0)
         new_state = apply_move(two_node_state, move)
         # The original edge weight should have increased
         assert new_state.graph[0][1]["weight"] > original_weight
@@ -239,13 +240,13 @@ class TestApplyMove:
 
         # Apply expand many times to push weight to cap
         for _ in range(5):
-            state = apply_move(state, ("expand", (a, b), 1.0))
+            state = apply_move(state, (MoveType.EXPAND, (a, b), 1.0))
         assert state.graph[a][b]["weight"] <= 3.0
 
     def test_integrate_collapses_triangle(self, triangle_state):
         """Integrate collapses a triangle into a single particle node.
         N decreases by 2 (3 removed, 1 added)."""
-        move = ("integrate", tuple(sorted(triangle_state.graph.nodes())[:3]), 1.0)
+        move = (MoveType.INTEGRATE, tuple(sorted(triangle_state.graph.nodes())[:3]), 1.0)
         new_state = apply_move(triangle_state, move)
         # 3 nodes → 1 particle node: net -2
         assert new_state.node_count == triangle_state.node_count - 2
@@ -261,7 +262,7 @@ class TestApplyMove:
         state.add_edge(c, d)  # external connection
         state.curvature_field = compute_local_curvature_field(state)
 
-        move = ("integrate", (a, b, c), 1.0)
+        move = (MoveType.INTEGRATE, (a, b, c), 1.0)
         new_state = apply_move(state, move)
         # The particle node should be connected to d
         particle = [n for n in new_state.graph.nodes() if n not in (a, b, c, d)][0]
@@ -270,7 +271,7 @@ class TestApplyMove:
     def test_integrate_removes_triangle_nodes(self, triangle_state):
         """Integrate removes the three triangle nodes from the graph."""
         nodes = list(triangle_state.graph.nodes())
-        move = ("integrate", tuple(nodes), 1.0)
+        move = (MoveType.INTEGRATE, tuple(nodes), 1.0)
         new_state = apply_move(triangle_state, move)
         for n in nodes:
             assert n not in new_state.graph
@@ -279,21 +280,21 @@ class TestApplyMove:
         """Deflate removes an isolated (degree-0) node."""
         # Find an isolated node
         isolated = [n for n in complex_state.graph.nodes() if complex_state.graph.degree(n) == 0][0]
-        move = ("deflate", (isolated,), 1.0)
+        move = (MoveType.DEFLATE, (isolated,), 1.0)
         new_state = apply_move(complex_state, move)
         assert isolated not in new_state.graph
         assert new_state.node_count == complex_state.node_count - 1
 
     def test_deflate_does_not_remove_connected_node(self, two_node_state):
         """Deflate does nothing to a connected node."""
-        move = ("deflate", (0,), 1.0)
+        move = (MoveType.DEFLATE, (0,), 1.0)
         new_state = apply_move(two_node_state, move)
         # Node 0 has degree 1, so deflate should not remove it
         assert new_state.node_count == two_node_state.node_count
 
     def test_seed_adds_two_nodes(self, empty_state):
         """Seed adds a disconnected pair of nodes connected by an edge."""
-        move = ("seed", (), 1.0)
+        move = (MoveType.SEED, (), 1.0)
         new_state = apply_move(empty_state, move)
         assert new_state.node_count == 2
         assert new_state.edge_count == 1
@@ -307,7 +308,7 @@ class TestApplyMove:
         state.add_edge(c, d)
         state.curvature_field = compute_local_curvature_field(state)
 
-        move = ("connect", (a, c), 1.0)
+        move = (MoveType.CONNECT, (a, c), 1.0)
         new_state = apply_move(state, move)
         assert new_state.graph.has_edge(a, c)
         assert nx.is_connected(new_state.graph)
@@ -321,7 +322,7 @@ class TestApplyMove:
         state.add_edge(c, d)
         state.curvature_field = compute_local_curvature_field(state)
 
-        move = ("connect", (a, c), 1.0)
+        move = (MoveType.CONNECT, (a, c), 1.0)
         new_state = apply_move(state, move)
         assert new_state.graph[a][c]["weight"] == 0.3
 
@@ -334,7 +335,7 @@ class TestApplyMove:
         # a and c share neighbour b but are not connected
         state.curvature_field = compute_local_curvature_field(state)
 
-        move = ("triangulate", (a, c), 1.0)
+        move = (MoveType.TRIANGULATE, (a, c), 1.0)
         new_state = apply_move(state, move)
         assert new_state.graph.has_edge(a, c)
         assert new_state.triple_count == 1  # triangle (a,b,c) formed
@@ -342,26 +343,26 @@ class TestApplyMove:
     def test_triangulate_does_not_duplicate_edge(self, triangle_state):
         """Triangulate does nothing if the edge already exists."""
         nodes = list(triangle_state.graph.nodes())
-        move = ("triangulate", (nodes[0], nodes[1]), 1.0)
+        move = (MoveType.TRIANGULATE, (nodes[0], nodes[1]), 1.0)
         new_state = apply_move(triangle_state, move)
         # Edge already exists, so nothing changes
         assert new_state.edge_count == triangle_state.edge_count
 
     def test_apply_move_increments_time(self, two_node_state):
         """Applied move increments time by 1."""
-        move = ("expand", (0, 1), 1.0)
+        move = (MoveType.EXPAND, (0, 1), 1.0)
         new_state = apply_move(two_node_state, move)
         assert new_state.time == two_node_state.time + 1
 
     def test_apply_move_updates_curvature(self, two_node_state):
         """Applied move recomputes the curvature field."""
-        move = ("expand", (0, 1), 1.0)
+        move = (MoveType.EXPAND, (0, 1), 1.0)
         new_state = apply_move(two_node_state, move)
         assert len(new_state.curvature_field) == new_state.node_count
 
     def test_integrate_cleans_up_triples(self, triangle_state):
         """Integrate removes all triples involving the collapsed nodes."""
-        move = ("integrate", tuple(sorted(triangle_state.graph.nodes())[:3]), 1.0)
+        move = (MoveType.INTEGRATE, tuple(sorted(triangle_state.graph.nodes())[:3]), 1.0)
         new_state = apply_move(triangle_state, move)
         assert new_state.triple_count == 0
 
@@ -390,7 +391,7 @@ class TestScoreMoveCheap:
     def test_deflate_returns_score_and_none(self, complex_state):
         """Deflate returns (score, None) — no graph copy needed."""
         isolated = [n for n in complex_state.graph.nodes() if complex_state.graph.degree(n) == 0][0]
-        move = ("deflate", (isolated,), 1.0)
+        move = (MoveType.DEFLATE, (isolated,), 1.0)
         score, ns = self._score(complex_state, move, C=1.0, lcs=3, U=5.0)
         assert isinstance(score, float)
         assert score > 0
@@ -398,7 +399,7 @@ class TestScoreMoveCheap:
 
     def test_seed_returns_score_and_none(self, two_node_state):
         """Seed returns (score, None) — no graph copy needed."""
-        move = ("seed", (), 1.0)
+        move = (MoveType.SEED, (), 1.0)
         score, ns = self._score(two_node_state, move, C=0.0, lcs=2, U=0.0)
         assert isinstance(score, float)
         assert ns is None
@@ -412,7 +413,7 @@ class TestScoreMoveCheap:
         state.add_edge(c, d)
         state.curvature_field = compute_local_curvature_field(state)
 
-        move = ("connect", (a, c), 1.0)
+        move = (MoveType.CONNECT, (a, c), 1.0)
         score, ns = self._score(state, move, C=0.0, lcs=2, U=0.0)
         assert isinstance(score, float)
         assert ns is None
@@ -425,14 +426,14 @@ class TestScoreMoveCheap:
         state.add_edge(b, c)
         state.curvature_field = compute_local_curvature_field(state)
 
-        move = ("triangulate", (a, c), 1.0)
+        move = (MoveType.TRIANGULATE, (a, c), 1.0)
         score, ns = self._score(state, move, C=0.0, lcs=3, U=0.0)
         assert isinstance(score, float)
         assert ns is None
 
     def test_expand_returns_score_and_state(self, two_node_state):
         """Expand returns (score, candidate_state) — graph copy needed."""
-        move = ("expand", (0, 1), 1.0)
+        move = (MoveType.EXPAND, (0, 1), 1.0)
         score, ns = self._score(two_node_state, move, C=0.0, lcs=2, U=0.0)
         assert isinstance(score, float)
         assert ns is not None
@@ -442,7 +443,7 @@ class TestScoreMoveCheap:
     def test_integrate_returns_score_and_state(self, triangle_state):
         """Integrate returns (score, candidate_state) — graph copy needed."""
         nodes = list(triangle_state.graph.nodes())
-        move = ("integrate", tuple(nodes), 1.0)
+        move = (MoveType.INTEGRATE, tuple(nodes), 1.0)
         score, ns = self._score(triangle_state, move, C=1.0, lcs=3, U=0.0)
         assert isinstance(score, float)
         assert ns is not None
@@ -450,8 +451,8 @@ class TestScoreMoveCheap:
 
     def test_higher_priority_increases_score(self, two_node_state):
         """Higher priority multiplies the Boltzmann factor."""
-        move_low = ("expand", (0, 1), 1.0)
-        move_high = ("expand", (0, 1), 5.0)
+        move_low = (MoveType.EXPAND, (0, 1), 1.0)
+        move_high = (MoveType.EXPAND, (0, 1), 5.0)
         score_low, _ = self._score(two_node_state, move_low, C=0.0, lcs=2, U=0.0)
         score_high, _ = self._score(two_node_state, move_high, C=0.0, lcs=2, U=0.0)
         assert score_high > score_low
@@ -465,7 +466,7 @@ class TestScoreMoveCheap:
         state.add_edge(b, c)
         state.curvature_field = compute_local_curvature_field(state)
 
-        move = ("triangulate", (a, c), 1.0)
+        move = (MoveType.TRIANGULATE, (a, c), 1.0)
 
         # Without topology_reward
         score_no_reward, _ = self._score(state, move, C=0.0, lcs=3, U=0.0, topology_reward=0.0)
@@ -476,7 +477,7 @@ class TestScoreMoveCheap:
 
     def test_size_penalty_affects_expand_score(self, two_node_state):
         """Size penalty makes expand moves less favourable for large graphs."""
-        move = ("expand", (0, 1), 1.0)
+        move = (MoveType.EXPAND, (0, 1), 1.0)
 
         # With small size_penalty
         score_low_pen, _ = self._score(
@@ -489,7 +490,7 @@ class TestScoreMoveCheap:
 
     def test_score_is_positive(self, two_node_state):
         """Boltzmann scores are always positive."""
-        move = ("expand", (0, 1), 1.0)
+        move = (MoveType.EXPAND, (0, 1), 1.0)
         score, _ = self._score(two_node_state, move, C=0.0, lcs=2, U=0.0)
         assert score > 0
 
@@ -506,10 +507,10 @@ class TestScoreMoveCheap:
         # a-d: common neighbour b → 1 new triangle
         state.curvature_field = compute_local_curvature_field(state)
 
-        move_ac = ("triangulate", (a, c), 1.0)
+        move_ac = (MoveType.TRIANGULATE, (a, c), 1.0)
         score_ac, _ = self._score(state, move_ac, C=0.0, lcs=4, U=0.0)
 
-        move_ad = ("triangulate", (a, d), 1.0)
+        move_ad = (MoveType.TRIANGULATE, (a, d), 1.0)
         score_ad, _ = self._score(state, move_ad, C=0.0, lcs=4, U=0.0)
 
         # Both should be valid and have positive scores
@@ -528,7 +529,7 @@ class TestScoreMoveCheap:
         state.add_edge(d, e)
         state.curvature_field = compute_local_curvature_field(state)
 
-        move = ("connect", (a, d), 1.0)
+        move = (MoveType.CONNECT, (a, d), 1.0)
         score, ns = self._score(state, move, C=0.0, lcs=3, U=0.0)
         assert score > 0
         assert ns is None  # analytical scoring, no copy needed
@@ -553,7 +554,7 @@ class TestScoreMoveCheap:
         assert state.largest_component_size() == 5
 
         # Connect the two small components (2+2=4, which is < 5)
-        move = ("connect", (a, c), 1.0)
+        move = (MoveType.CONNECT, (a, c), 1.0)
         score, ns = self._score(state, move, C=0.0, lcs=5, U=0.0)
         assert score > 0
         assert ns is None
@@ -574,7 +575,7 @@ class TestScoreMoveCheap:
         state2.add_edge(p, q)
         state2.curvature_field = compute_local_curvature_field(state2)
 
-        move2 = ("connect", (x, p), 1.0)
+        move2 = (MoveType.CONNECT, (x, p), 1.0)
         score2, _ = self._score(state2, move2, C=0.0, lcs=2, U=0.0)
         assert score2 > 0
 

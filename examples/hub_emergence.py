@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from relate import RealitySimulation
+from relate.dynamics import MoveType
 from relate.measures import degree_distribution
 
 np.random.seed(42)
@@ -51,8 +52,8 @@ for snap in SNAPSHOTS:
     hubs = sum(1 for d in degs if d > 3 * avg)
 
     window = sim.history[prev_t:snap]
-    integrate_w = sum(1 for h in window if h["move_type"] == "integrate")
-    tri_w = sum(1 for h in window if h["move_type"] == "triangulate")
+    integrate_w = sum(1 for h in window if h["move_type"] is MoveType.INTEGRATE)
+    tri_w = sum(1 for h in window if h["move_type"] is MoveType.TRIANGULATE)
 
     dd = degree_distribution(sim.state)
 

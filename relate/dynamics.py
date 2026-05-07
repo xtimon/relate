@@ -1,15 +1,15 @@
 """
 Move generation, application, and cheap scoring for the graph universe.
 
-A *move* is a 3-tuple  (move_type: str, args: tuple, priority: float).
-Six built-in move types are provided:
+A *move* is a 3-tuple  ``(move_type: MoveType, args: tuple, priority: float)``.
+Six built-in move types are provided via the :class:`MoveType` enum:
 
-    expand      — subdivide an edge by inserting a new node
-    integrate   — collapse a triangle into a single particle node
-    deflate     — remove an isolated (degree-0) node
-    seed        — vacuum fluctuation: add a node pair attached to the main graph
-    connect     — bridge the two largest components with a weak edge
-    triangulate — close an open triangle (add edge between two non-adjacent
+    EXPAND      — subdivide an edge by inserting a new node
+    INTEGRATE   — collapse a triangle into a single particle node
+    DEFLATE     — remove an isolated (degree-0) node
+    SEED        — vacuum fluctuation: add a node pair attached to the main graph
+    CONNECT     — bridge the two largest components with a weak edge
+    TRIANGULATE — close an open triangle (add edge between two non-adjacent
                   nodes that share a common neighbour).  ΔN=0, ΔT≥1.
                   This is the primary mechanism for increasing topological
                   density and pushing the spectral dimension toward d_s=2.
@@ -21,6 +21,7 @@ Custom move generators can be passed to RealitySimulation via the
 import random
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum, auto
 
 import networkx as nx
 import numpy as np
@@ -28,7 +29,25 @@ import numpy as np
 from .physics import compute_curvature, compute_local_curvature_field
 from .state import RealityState
 
-Move = tuple[str, tuple, float]
+
+class MoveType(Enum):
+    """The six fundamental graph-rewriting operations in the RELATE universe."""
+
+    EXPAND = auto()
+    """Subdivide an edge by inserting a new node (ΔN=+1, ΔE=+2)."""
+    INTEGRATE = auto()
+    """Collapse a triangle into a single particle node (ΔN=−2)."""
+    DEFLATE = auto()
+    """Remove an isolated (degree-0) node (ΔN=−1)."""
+    SEED = auto()
+    """Vacuum fluctuation: add a node pair attached to the main graph (ΔN=+2)."""
+    CONNECT = auto()
+    """Bridge two components with a weak edge (ΔN=0)."""
+    TRIANGULATE = auto()
+    """Close an open triangle (ΔN=0, ΔT≥1)."""
+
+
+Move = tuple[MoveType, tuple, float]
 
 
 @dataclass(frozen=True)
@@ -121,26 +140,28 @@ def generate_moves(state: RealityState) -> list[Move]:
         edges = list(state.graph.edges())
         sample = random.sample(edges, min(_EXPAND_SAMPLE_SIZE, len(edges)))
         for u, v in sample:
-            moves.append(("expand", (u, v), _DEFAULT_PRIORITY))
+            moves.append((MoveType.EXPAND, (u, v), _DEFAULT_PRIORITY))
 
     if state.triple_count > 0:
         triples = list(state.triples)
         sample = random.sample(triples, min(_INTEGRATE_SAMPLE_SIZE, len(triples)))
         for t in sample:
-            moves.append(("integrate", t, _DEFAULT_PRIORITY))
+            moves.append((MoveType.INTEGRATE, t, _DEFAULT_PRIORITY))
 
     for node in state.graph.nodes():
         if state.graph.degree(node) == 0:
-            moves.append(("deflate", (node,), _DEFAULT_PRIORITY))
+            moves.append((MoveType.DEFLATE, (node,), _DEFAULT_PRIORITY))
 
-    moves.append(("seed", (), _DEFAULT_PRIORITY))
+    moves.append((MoveType.SEED, (), _DEFAULT_PRIORITY))
 
     if state.node_count >= _MIN_NODES_FOR_CONNECT and not nx.is_connected(state.graph):
         components = sorted(nx.connected_components(state.graph), key=len, reverse=True)
         if len(components) >= 2:
             c1, c2 = list(components[0]), list(components[1])
             if c1 and c2:
-                moves.append(("connect", (random.choice(c1), random.choice(c2)), _CONNECT_PRIORITY))
+                moves.append(
+                    (MoveType.CONNECT, (random.choice(c1), random.choice(c2)), _CONNECT_PRIORITY)
+                )
 
     # TRIANGULATE: close an open triangle (ΔN=0, ΔT≥1).
     # Sample nodes, collect non-adjacent neighbour pairs, pick up to 8.
@@ -162,7 +183,7 @@ def generate_moves(state: RealityState) -> list[Move]:
                 break
         if open_pairs:
             for u, v in random.sample(open_pairs, min(_TRIANGULATE_MOVE_LIMIT, len(open_pairs))):
-                moves.append(("triangulate", (u, v), _TRIANGULATE_PRIORITY))
+                moves.append((MoveType.TRIANGULATE, (u, v), _TRIANGULATE_PRIORITY))
 
     return moves
 
@@ -182,7 +203,7 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
 
     move_type, args = move[0], move[1]
 
-    if move_type == "expand":
+    if move_type is MoveType.EXPAND:
         u, v = args
         if u in ns.graph and v in ns.graph:
             w = ns.add_node()
@@ -194,7 +215,7 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
                     ns.graph[u][v].get("weight", _DEFAULT_EDGE_WEIGHT) * _EXPAND_WEIGHT_MULTIPLIER,
                 )
 
-    elif move_type == "integrate":
+    elif move_type is MoveType.INTEGRATE:
         u, v, w = args
         if all(n in ns.graph for n in (u, v, w)):
             particle = ns.add_node()
@@ -211,12 +232,12 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
                 ns.curvature_field.pop(n, None)
             ns.triples = {t for t in ns.triples if not any(n in (u, v, w) for n in t)}
 
-    elif move_type == "deflate":
+    elif move_type is MoveType.DEFLATE:
         (node,) = args
         if node in ns.graph and ns.graph.degree(node) == 0:
             ns.remove_node(node)
 
-    elif move_type == "seed":
+    elif move_type is MoveType.SEED:
         a = ns.add_node()
         b = ns.add_node()
         ns.add_edge(a, b, weight=_DEFAULT_EDGE_WEIGHT)
@@ -228,12 +249,12 @@ def apply_move(state: RealityState, move: Move) -> RealityState:
             anchor = random.choice(existing)
             ns.add_edge(a, anchor, weight=_DEFAULT_EDGE_WEIGHT)
 
-    elif move_type == "connect":
+    elif move_type is MoveType.CONNECT:
         u, v = args
         if u in ns.graph and v in ns.graph:
             ns.add_edge(u, v, weight=_CONNECT_WEIGHT)
 
-    elif move_type == "triangulate":
+    elif move_type is MoveType.TRIANGULATE:
         u, v = args
         if u in ns.graph and v in ns.graph and not ns.graph.has_edge(u, v):
             ns.add_edge(u, v, weight=_DEFAULT_EDGE_WEIGHT)
@@ -313,16 +334,16 @@ def score_move_cheap(
         )
         return float(priority * np.exp(-(ns_E - E)))
 
-    if move_type == "deflate":
+    if move_type is MoveType.DEFLATE:
         # Isolated node: curvature 0, outside largest component, no triangles.
         return _score(C, lcs, N - 1, T), None
 
-    elif move_type == "seed":
+    elif move_type is MoveType.SEED:
         # Two fresh nodes + two edges (pair + anchor): no new triangles.
         # The new nodes join the main component, so LCS increases by 2.
         return _score(C, lcs + 2, N + 2, T), None
 
-    elif move_type == "connect":
+    elif move_type is MoveType.CONNECT:
         # Cross-component edge: endpoints share no neighbours → no new triangles.
         # The new LCS is the merged component size, but only if it exceeds the
         # current LCS (there may be a third, larger component that is untouched).
@@ -332,13 +353,13 @@ def score_move_cheap(
         merged = len(comp_u) + len(comp_v)
         return _score(C, max(merged, lcs), N, T), None
 
-    elif move_type == "triangulate":
+    elif move_type is MoveType.TRIANGULATE:
         # ΔN=0, ΔT = common neighbours of u and v (exact, no copy needed).
         u, v = args
         common = len(set(state.graph.neighbors(u)) & set(state.graph.neighbors(v)))
         return _score(C, lcs, N, T + common), None
 
-    else:  # expand / integrate: topology changes require a graph copy
+    else:  # EXPAND / INTEGRATE: topology changes require a graph copy
         ns = apply_move(state, move)
         ns_C = compute_curvature(ns)
         score = _score(ns_C, ns.largest_component_size(), ns.node_count, ns.triple_count)

@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from relate import RealitySimulation
-from relate.dynamics import generate_moves
+from relate.dynamics import MoveType, generate_moves
 from relate.physics import compute_local_curvature_field
 from relate.state import RealityState
 
@@ -97,7 +97,7 @@ class TestInitialization:
         """Custom move generator is used instead of default."""
 
         def my_moves(state):
-            return [("seed", (), 1.0)]
+            return [(MoveType.SEED, (), 1.0)]
 
         sim = RealitySimulation(move_generator=my_moves, record_all_states=False)
         assert sim.move_generator is my_moves
@@ -166,7 +166,7 @@ class TestStep:
     def test_step_move_type_is_valid(self):
         """The chosen move type is one of the six built-in types."""
         sim = RealitySimulation(record_all_states=False)
-        valid_types = {"expand", "integrate", "connect", "seed", "deflate", "triangulate"}
+        valid_types = set(MoveType)
         for _ in range(50):
             record = sim.step()
             assert record["move_type"] in valid_types
@@ -202,13 +202,13 @@ class TestStep:
         # Node count could increase (expand, seed), decrease (integrate, deflate),
         # or stay the same (connect, triangulate)
         record = sim.history[-1]
-        if record["move_type"] in ("expand",):
+        if record["move_type"] is MoveType.EXPAND:
             assert record["nodes"] == initial_n + 1
-        elif record["move_type"] == "seed":
+        elif record["move_type"] is MoveType.SEED:
             assert record["nodes"] == initial_n + 2
-        elif record["move_type"] == "deflate":
+        elif record["move_type"] is MoveType.DEFLATE:
             assert record["nodes"] == initial_n - 1
-        elif record["move_type"] == "integrate":
+        elif record["move_type"] is MoveType.INTEGRATE:
             assert record["nodes"] == initial_n - 2
         else:  # connect, triangulate
             assert record["nodes"] == initial_n
@@ -286,7 +286,7 @@ class TestRun:
         history = sim.run(steps=30, verbose=False)
         assert len(history) == 30
         # Should have some triangulate moves
-        triangulate_count = sum(1 for r in history if r["move_type"] == "triangulate")
+        triangulate_count = sum(1 for r in history if r["move_type"] is MoveType.TRIANGULATE)
         assert triangulate_count >= 0  # at least doesn't crash
 
     def test_run_with_large_beta(self):
@@ -350,8 +350,8 @@ class TestSummary:
         sim.run(steps=50, verbose=False)
         sim.summary()
         captured = capsys.readouterr()
-        for mt in ("expand", "integrate", "connect", "seed", "deflate"):
-            assert mt in captured.out
+        for mt in MoveType:
+            assert mt.name in captured.out
 
 
 # ── Custom Move Generators ────────────────────────────────────────────────────
@@ -377,12 +377,12 @@ class TestCustomMoveGenerator:
         """Generator that only returns seed moves works."""
 
         def only_seed(state):
-            return [("seed", (), 1.0)]
+            return [(MoveType.SEED, (), 1.0)]
 
         sim = RealitySimulation(move_generator=only_seed, record_all_states=False)
         history = sim.run(steps=20, verbose=False)
         for r in history:
-            assert r["move_type"] == "seed"
+            assert r["move_type"] is MoveType.SEED
         # Seed adds 2 nodes per step
         assert sim.state.node_count == 2 + 2 * 20
 
@@ -393,16 +393,16 @@ class TestCustomMoveGenerator:
             moves = []
             for node in state.graph.nodes():
                 if state.graph.degree(node) == 0:
-                    moves.append(("deflate", (node,), 1.0))
+                    moves.append((MoveType.DEFLATE, (node,), 1.0))
             if not moves:
-                moves.append(("seed", (), 1.0))
+                moves.append((MoveType.SEED, (), 1.0))
             return moves
 
         sim = RealitySimulation(move_generator=only_deflate, record_all_states=False)
         history = sim.run(steps=20, verbose=False)
         # Should have some deflate and some seed moves
         types = set(r["move_type"] for r in history)
-        assert "deflate" in types or "seed" in types
+        assert MoveType.DEFLATE in types or MoveType.SEED in types
 
 
 # ── Initial States ────────────────────────────────────────────────────────────

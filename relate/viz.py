@@ -10,6 +10,7 @@ import networkx as nx
 import numpy as np
 from matplotlib.animation import FuncAnimation, PillowWriter
 
+from .dynamics import MoveType
 from .simulator import RealitySimulation
 
 
@@ -126,7 +127,7 @@ def create_perfect_animation(
                 ax2.plot(ct, cm, "r-", linewidth=1.5, label="max |δ|")
                 ax2.plot(ct, cs, "b-", linewidth=1.5, label="σ(δ)")
                 for i, h in enumerate(history[:slice_end]):
-                    if h["move_type"] == "integrate" and i < len(cm):
+                    if h["move_type"] is MoveType.INTEGRATE and i < len(cm):
                         ax2.scatter(
                             h["time"],
                             cm[i],
@@ -255,7 +256,7 @@ def plot_final_universe(sim: RealitySimulation, history: list[dict]) -> None:
         ax3.fill_between(times, 0, curv_std, alpha=0.2, color="cyan")
         ax3.plot(times, curv_max, "r-", linewidth=2, label="max |δ|")
         ax3.plot(times, curv_std, "b-", linewidth=2, label="σ(δ)")
-        integrate_times = [h["time"] for h in history if h["move_type"] == "integrate"]
+        integrate_times = [h["time"] for h in history if h["move_type"] is MoveType.INTEGRATE]
         integrate_vals = [curv_max[min(t - 1, len(curv_max) - 1)] for t in integrate_times]
         if integrate_vals:
             ax3.scatter(
@@ -297,17 +298,24 @@ def plot_final_universe(sim: RealitySimulation, history: list[dict]) -> None:
         ax5.tick_params(axis="y", colors="brown")
 
         move_colors = {
-            "expand": "#3498db",
-            "integrate": "#e74c3c",
-            "connect": "#2ecc71",
-            "seed": "#f39c12",
-            "deflate": "#95a5a6",
+            MoveType.EXPAND: "#3498db",
+            MoveType.INTEGRATE: "#e74c3c",
+            MoveType.CONNECT: "#2ecc71",
+            MoveType.SEED: "#f39c12",
+            MoveType.DEFLATE: "#95a5a6",
         }
         window = 20
         bottom = np.zeros(len(times))
-        for mt in ("expand", "integrate", "connect", "seed", "deflate"):
+        move_type_order = (
+            MoveType.EXPAND,
+            MoveType.INTEGRATE,
+            MoveType.CONNECT,
+            MoveType.SEED,
+            MoveType.DEFLATE,
+        )
+        for mt in move_type_order:
             counts = [
-                sum(1 for r in history[max(0, i - window + 1) : i + 1] if r["move_type"] == mt)
+                sum(1 for r in history[max(0, i - window + 1) : i + 1] if r["move_type"] is mt)
                 for i in range(len(history))
             ]
             ax5b.fill_between(
@@ -316,7 +324,7 @@ def plot_final_universe(sim: RealitySimulation, history: list[dict]) -> None:
                 bottom + np.array(counts),
                 alpha=0.3,
                 color=move_colors[mt],
-                label=mt,
+                label=mt.name.lower(),
             )
             bottom += np.array(counts)
         ax5b.set_ylabel("Move frequency (window 20)", color="white")

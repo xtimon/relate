@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import relate
+from relate.dynamics import MoveType
 from relate import RealitySimulation
 from relate.measures import (
     network_summary,
@@ -57,7 +58,7 @@ for beta in [3.0, 10.0, 20.0, 50.0]:
     d_s, t_v, p_v = spectral_dimension(sim.state)
     ns = network_summary(sim.state)
     sw = small_world_metrics(sim.state)
-    integrate_count = sum(1 for h in sim.history if h["move_type"] == "integrate")
+    integrate_count = sum(1 for h in sim.history if h["move_type"] is MoveType.INTEGRATE)
 
     path1.append(dict(
         beta=beta, d_s=d_s, t_vals=t_v, p_vals=p_v,
@@ -91,7 +92,7 @@ for tr in [0.0, 2.0, 5.0, 10.0]:
     d_s, t_v, p_v = spectral_dimension(sim.state)
     ns = network_summary(sim.state)
     sw = small_world_metrics(sim.state)
-    triangulate_count = sum(1 for h in sim.history if h["move_type"] == "triangulate")
+    triangulate_count = sum(1 for h in sim.history if h["move_type"] is MoveType.TRIANGULATE)
 
     path2.append(dict(
         topology_reward=tr, d_s=d_s, t_vals=t_v, p_vals=p_v,

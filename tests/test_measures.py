@@ -10,6 +10,7 @@ import networkx as nx
 import numpy as np
 import pytest
 
+from relate.dynamics import MoveType
 from relate.measures import (
     _largest_component,
     complexity_slope,
@@ -90,12 +91,12 @@ def grid_state():
 def sample_history():
     """A sample history list for testing thermodynamic measures."""
     return [
-        {"time": 0, "U": 0.0, "C": 0.0, "move_type": "seed", "curvature_max": 0.0},
-        {"time": 1, "U": 5.0, "C": 1.0, "move_type": "expand", "curvature_max": 0.5},
-        {"time": 2, "U": 8.0, "C": 2.0, "move_type": "integrate", "curvature_max": 1.2},
-        {"time": 3, "U": 10.0, "C": 1.5, "move_type": "expand", "curvature_max": 0.8},
-        {"time": 4, "U": 10.0, "C": 1.0, "move_type": "integrate", "curvature_max": 1.5},
-        {"time": 5, "U": 12.0, "C": 0.5, "move_type": "connect", "curvature_max": 0.3},
+        {"time": 0, "U": 0.0, "C": 0.0, "move_type": MoveType.SEED, "curvature_max": 0.0},
+        {"time": 1, "U": 5.0, "C": 1.0, "move_type": MoveType.EXPAND, "curvature_max": 0.5},
+        {"time": 2, "U": 8.0, "C": 2.0, "move_type": MoveType.INTEGRATE, "curvature_max": 1.2},
+        {"time": 3, "U": 10.0, "C": 1.5, "move_type": MoveType.EXPAND, "curvature_max": 0.8},
+        {"time": 4, "U": 10.0, "C": 1.0, "move_type": MoveType.INTEGRATE, "curvature_max": 1.5},
+        {"time": 5, "U": 12.0, "C": 0.5, "move_type": MoveType.CONNECT, "curvature_max": 0.3},
     ]
 
 
@@ -440,8 +441,8 @@ class TestIntegrateEventAnalysis:
     def test_no_events(self):
         """No integrate events returns count=0."""
         history = [
-            {"move_type": "expand", "time": 0, "curvature_max": 0.0},
-            {"move_type": "seed", "time": 1, "curvature_max": 0.5},
+            {"move_type": MoveType.EXPAND, "time": 0, "curvature_max": 0.0},
+            {"move_type": MoveType.SEED, "time": 1, "curvature_max": 0.5},
         ]
         analysis = integrate_event_analysis(history)
         assert analysis["count"] == 0
@@ -451,9 +452,9 @@ class TestIntegrateEventAnalysis:
     def test_single_event(self):
         """Single integrate event returns correct data."""
         history = [
-            {"move_type": "expand", "time": 0, "curvature_max": 0.0},
-            {"move_type": "integrate", "time": 1, "curvature_max": 1.5},
-            {"move_type": "expand", "time": 2, "curvature_max": 0.5},
+            {"move_type": MoveType.EXPAND, "time": 0, "curvature_max": 0.0},
+            {"move_type": MoveType.INTEGRATE, "time": 1, "curvature_max": 1.5},
+            {"move_type": MoveType.EXPAND, "time": 2, "curvature_max": 0.5},
         ]
         analysis = integrate_event_analysis(history)
         assert analysis["count"] == 1

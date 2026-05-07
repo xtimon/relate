@@ -22,14 +22,14 @@ At each step the simulator:
   4. Samples a move proportionally to exp(−ΔE) × priority.
   5. Applies the chosen move and records observables.
 
-Six move types are available:
+Six move types are available (see :class:`~relate.dynamics.MoveType`):
 
-    expand      — subdivide an edge by inserting a new node (ΔN=+1, ΔE=+2)
-    integrate   — collapse a triangle into a single particle node (ΔN=−2)
-    deflate     — remove an isolated (degree-0) node (ΔN=−1)
-    seed        — vacuum fluctuation: add a node pair attached to the main graph (ΔN=+2)
-    connect     — bridge two components with a weak edge (ΔN=0)
-    triangulate — close an open triangle (ΔN=0, ΔT≥1)
+    EXPAND      — subdivide an edge by inserting a new node (ΔN=+1, ΔE=+2)
+    INTEGRATE   — collapse a triangle into a single particle node (ΔN=−2)
+    DEFLATE     — remove an isolated (degree-0) node (ΔN=−1)
+    SEED        — vacuum fluctuation: add a node pair attached to the main graph (ΔN=+2)
+    CONNECT     — bridge two components with a weak edge (ΔN=0)
+    TRIANGULATE — close an open triangle (ΔN=0, ΔT≥1)
 """
 
 import zlib
@@ -38,7 +38,7 @@ from typing import Optional
 
 import numpy as np
 
-from .dynamics import ScoringParams, apply_move, generate_moves, score_move_cheap
+from .dynamics import MoveType, ScoringParams, apply_move, generate_moves, score_move_cheap
 from .physics import (
     _ZLIB_LEVEL,
     compute_accumulated_complexity,
@@ -226,7 +226,7 @@ class RealitySimulation:
             "C": C,
             "I": I,
             "U": U,
-            "move_type": chosen[0],
+            "move_type": MoveType(chosen[0]) if not isinstance(chosen[0], MoveType) else chosen[0],
             "complexity_bytes": len(zlib.compress(serialize_state(self.state), level=_ZLIB_LEVEL)),
             "curvature_mean": float(np.mean(curvs)),
             "curvature_std": float(np.std(curvs)),
@@ -288,14 +288,14 @@ class RealitySimulation:
         lcs = s.largest_component_size()
         print(f"  Largest comp.:  {lcs} ({100 * lcs / max(1, s.node_count):.1f}%)")
         print("\nEvent counts:")
-        for mt in ("expand", "integrate", "connect", "seed", "deflate", "triangulate"):
-            print(f"  {mt:12s}: {sum(1 for r in h if r['move_type'] == mt)}")
+        for mt in MoveType:
+            print(f"  {mt.name:12s}: {sum(1 for r in h if r['move_type'] is mt)}")
         print("\nCurvature ripple:")
         print(f"  Max amplitude:  {max(r['curvature_max'] for r in h):.4e}")
         print(f"  Mean std dev:   {np.mean([r['curvature_std'] for r in h]):.4e}")
         print(
             f"  INTEGRATE events (particle births): "
-            f"{sum(1 for r in h if r['move_type'] == 'integrate')}"
+            f"{sum(1 for r in h if r['move_type'] is MoveType.INTEGRATE)}"
         )
         print("\nInformation:")
         print(f"  Final I(G):     {h[-1]['I']:.4f}")

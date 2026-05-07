@@ -170,7 +170,9 @@ def integrate_event_analysis(history: list[dict]) -> dict:
     Statistics about integrate (particle-birth) events: their timing,
     curvature amplitude at the moment they occur, and inter-event intervals.
     """
-    events = [h for h in history if h["move_type"] == "integrate"]
+    from .dynamics import MoveType
+
+    events = [h for h in history if h["move_type"] is MoveType.INTEGRATE]
     if not events:
         return {"count": 0, "times": [], "curv_amplitudes": [], "mean_interval": None}
     times = [h["time"] for h in events]

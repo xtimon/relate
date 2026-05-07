@@ -28,6 +28,7 @@ import numpy as np
 from scipy.signal import find_peaks
 
 import relate
+from relate.dynamics import MoveType
 from relate import RealitySimulation
 from relate.measures import (
     complexity_slope,
@@ -204,10 +205,11 @@ with plt.style.context("dark_background"):
 
     # 6. Move-type entropy (diversity of dynamics) -----------------------------
     ax6 = fig.add_subplot(2, 3, 6, facecolor="#1a1a2e")
-    move_types = ["expand", "integrate", "connect", "seed", "deflate"]
+    move_types = [MoveType.EXPAND, MoveType.INTEGRATE, MoveType.CONNECT, MoveType.SEED, MoveType.DEFLATE]
     move_colors = ["#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#95a5a6"]
-    counts = [sum(1 for h in history if h["move_type"] == mt) for mt in move_types]
-    bars = ax6.bar(move_types, counts, color=move_colors, edgecolor="none")
+    counts = [sum(1 for h in history if h["move_type"] is mt) for mt in move_types]
+    move_type_names = [mt.name.lower() for mt in move_types]
+    bars = ax6.bar(move_type_names, counts, color=move_colors, edgecolor="none")
     for bar, count in zip(bars, counts):
         ax6.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
                  str(count), ha="center", va="bottom", color="white", fontsize=10)
