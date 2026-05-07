@@ -38,7 +38,7 @@ from typing import Optional
 
 import numpy as np
 
-from .dynamics import apply_move, generate_moves, score_move_cheap
+from .dynamics import ScoringParams, apply_move, generate_moves, score_move_cheap
 from .physics import (
     _ZLIB_LEVEL,
     compute_accumulated_complexity,
@@ -177,21 +177,25 @@ class RealitySimulation:
         scores: list[float] = []
         candidate_states: dict[int, RealityState] = {}
 
+        scoring_params = ScoringParams(
+            alpha=self.alpha,
+            beta=self.beta,
+            gamma=self.gamma,
+            vacuum=self.vacuum,
+            connectivity=self.connectivity,
+            size_penalty=self.size_penalty,
+            topology_reward=self.topology_reward,
+        )
+
         for i, move in enumerate(moves):
             score, ns = score_move_cheap(
                 self.state,
                 move,
                 E_scoring,
-                self.alpha,
-                self.beta,
-                self.gamma,
-                self.vacuum,
-                self.connectivity,
+                scoring_params,
                 C,
                 lcs,
                 U,
-                self.size_penalty,
-                self.topology_reward,
             )
             scores.append(score)
             if ns is not None:

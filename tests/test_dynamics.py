@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from relate.dynamics import (
+    ScoringParams,
     apply_move,
     generate_moves,
     score_move_cheap,
@@ -371,35 +372,20 @@ class TestApplyMove:
 class TestScoreMoveCheap:
     """Boltzmann scoring of moves using cheap energy approximation."""
 
-    def _default_params(self):
-        return {
-            "alpha": 0.3,
-            "beta": 3.0,
-            "gamma": 0.02,
-            "vacuum": 0.8,
-            "connectivity": 3.0,
-            "size_penalty": 0.004,
-            "topology_reward": 0.0,
-        }
+    def _default_params(self, **overrides) -> ScoringParams:
+        return ScoringParams(
+            alpha=overrides.get("alpha", 0.3),
+            beta=overrides.get("beta", 3.0),
+            gamma=overrides.get("gamma", 0.02),
+            vacuum=overrides.get("vacuum", 0.8),
+            connectivity=overrides.get("connectivity", 3.0),
+            size_penalty=overrides.get("size_penalty", 0.004),
+            topology_reward=overrides.get("topology_reward", 0.0),
+        )
 
     def _score(self, state, move, E=0.0, C=0.0, lcs=0, U=0.0, **overrides):
-        params = self._default_params()
-        params.update(overrides)
-        return score_move_cheap(
-            state,
-            move,
-            E,
-            params["alpha"],
-            params["beta"],
-            params["gamma"],
-            params["vacuum"],
-            params["connectivity"],
-            C,
-            lcs,
-            U,
-            params["size_penalty"],
-            params["topology_reward"],
-        )
+        params = self._default_params(**overrides)
+        return score_move_cheap(state, move, E, params, C, lcs, U)
 
     def test_deflate_returns_score_and_none(self, complex_state):
         """Deflate returns (score, None) — no graph copy needed."""
@@ -613,20 +599,23 @@ class TestMoveLifecycle:
         best_move = None
         best_candidate = None
 
+        params = ScoringParams(
+            alpha=0.3,
+            beta=3.0,
+            gamma=0.02,
+            vacuum=0.8,
+            connectivity=3.0,
+            size_penalty=0.004,
+            topology_reward=0.0,
+        )
         for move in moves:
             score, candidate = score_move_cheap(
                 triangle_state,
                 move,
                 E,
-                0.3,
-                3.0,
-                0.02,
-                0.8,
-                3.0,
+                params,
                 C,
                 lcs,
-                0.0,
-                0.004,
                 0.0,
             )
             if score > best_score:
@@ -653,23 +642,18 @@ class TestMoveLifecycle:
         lcs = triangle_state.largest_component_size()
         E = 0.3 * C - 3.0 * (lcs / max(1, triangle_state.node_count))
 
+        params = ScoringParams(
+            alpha=0.3,
+            beta=3.0,
+            gamma=0.02,
+            vacuum=0.8,
+            connectivity=3.0,
+            size_penalty=0.004,
+            topology_reward=0.0,
+        )
         scores = []
         for move in moves:
-            score, _ = score_move_cheap(
-                triangle_state,
-                move,
-                E,
-                0.3,
-                3.0,
-                0.02,
-                0.8,
-                3.0,
-                C,
-                lcs,
-                0.0,
-                0.004,
-                0.0,
-            )
+            score, _ = score_move_cheap(triangle_state, move, E, params, C, lcs, 0.0)
             scores.append(score)
 
         # Not all scores should be identical
@@ -682,24 +666,19 @@ class TestMoveLifecycle:
         lcs = triangle_state.largest_component_size()
         E = 0.3 * C - 3.0 * (lcs / max(1, triangle_state.node_count))
 
+        params = ScoringParams(
+            alpha=0.3,
+            beta=3.0,
+            gamma=0.02,
+            vacuum=0.8,
+            connectivity=3.0,
+            size_penalty=0.004,
+            topology_reward=0.0,
+        )
         scores = []
         candidates = {}
         for i, move in enumerate(moves):
-            score, ns = score_move_cheap(
-                triangle_state,
-                move,
-                E,
-                0.3,
-                3.0,
-                0.02,
-                0.8,
-                3.0,
-                C,
-                lcs,
-                0.0,
-                0.004,
-                0.0,
-            )
+            score, ns = score_move_cheap(triangle_state, move, E, params, C, lcs, 0.0)
             scores.append(score)
             if ns is not None:
                 candidates[i] = ns

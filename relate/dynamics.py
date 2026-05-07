@@ -20,6 +20,7 @@ Custom move generators can be passed to RealitySimulation via the
 
 import random
 from collections import defaultdict
+from dataclasses import dataclass
 
 import networkx as nx
 import numpy as np
@@ -28,6 +29,37 @@ from .physics import compute_curvature, compute_local_curvature_field
 from .state import RealityState
 
 Move = tuple[str, tuple, float]
+
+
+@dataclass(frozen=True)
+class ScoringParams:
+    """Immutable bundle of energy-functional coefficients for move scoring.
+
+    Carries the seven scalar weights that define the energy functional:
+
+        E = α·C − β·I + γ·U − vacuum·N − connectivity·(LCS/N)
+            + size_penalty·N² − topology_reward·T/N
+
+    Using a single dataclass instead of 7 individual parameters keeps the
+    :func:`score_move_cheap` signature manageable and makes the call site
+    in :class:`~relate.simulator.RealitySimulation` less error-prone.
+    """
+
+    alpha: float = 0.3
+    """Weight of curvature penalty C."""
+    beta: float = 3.0
+    """Weight of integrated-information reward I."""
+    gamma: float = 0.02
+    """Weight of complexity growth U."""
+    vacuum: float = 0.8
+    """Cost per node — drives expansion."""
+    connectivity: float = 3.0
+    """Reward for the fraction of nodes in the largest component."""
+    size_penalty: float = 0.004
+    """Coefficient of the ``+size_penalty · N²`` equilibrium term."""
+    topology_reward: float = 0.0
+    """Coefficient of the ``−topology_reward · T/N`` triangle-density term."""
+
 
 # ── Sampling budgets (move generation) ────────────────────────────────────────
 _EXPAND_SAMPLE_SIZE: int = 15
@@ -219,16 +251,10 @@ def score_move_cheap(
     state: RealityState,
     move: Move,
     E: float,
-    alpha: float,
-    beta: float,
-    gamma: float,
-    vacuum: float,
-    connectivity: float,
+    params: ScoringParams,
     C: float,
     lcs: int,
     U: float,
-    size_penalty: float = 0.0,
-    topology_reward: float = 0.0,
 ) -> tuple[float, RealityState | None]:
     """
     Boltzmann score exp(−ΔE) for *move* using a cheap energy approximation.
@@ -237,20 +263,32 @@ def score_move_cheap(
     integrated information I is proxied by lcs/N and complexity U is held
     constant for this step (γ = 0.02 makes its intra-step variation negligible).
 
-    size_penalty adds ``+size_penalty * N²`` to the energy; its per-step
-    delta for expand is ``≈ 2·size_penalty·N``, creating a soft equilibrium
-    at ``N* ≈ vacuum / (2·size_penalty)``.
-
-    topology_reward adds ``−topology_reward * T/N`` where T = triangle count.
-    Moves that increase T relative to N (especially *triangulate*) lower the
-    energy and are preferentially selected, driving topological density and
-    spectral dimension upward toward d_s ≈ 2.
+    The energy-functional coefficients are passed as a single
+    :class:`ScoringParams` dataclass rather than 7 individual parameters.
 
     For *deflate*, *seed*, *connect*, and *triangulate* the score is fully
     analytical — no graph copy is needed.  For *expand* and *integrate* the
     move is applied to a graph copy so that the updated curvature and
     triangle count can be used; the resulting state is returned so the
     caller can reuse it if this move is chosen.
+
+    Parameters
+    ----------
+    state : RealityState
+        Current graph state (before the move).
+    move : Move
+        Candidate move tuple ``(type, args, priority)``.
+    E : float
+        Energy of the current state (used as baseline for ΔE).
+    params : ScoringParams
+        Energy-functional coefficients (alpha, beta, gamma, vacuum,
+        connectivity, size_penalty, topology_reward).
+    C : float
+        Integrated squared curvature of the current state.
+    lcs : int
+        Largest component size of the current state.
+    U : float
+        Accumulated complexity of the current state.
 
     Returns
     -------
@@ -265,13 +303,13 @@ def score_move_cheap(
     def _score(ns_C: float, ns_lcs: int, ns_N: int, ns_T: int) -> float:
         ns_I_proxy = ns_lcs / max(1, ns_N)
         ns_E = (
-            alpha * ns_C
-            - beta * ns_I_proxy
-            + gamma * U
-            - vacuum * ns_N
-            - connectivity * (ns_lcs / max(1, ns_N))
-            + size_penalty * ns_N**2
-            - topology_reward * ns_T / max(1, ns_N)
+            params.alpha * ns_C
+            - params.beta * ns_I_proxy
+            + params.gamma * U
+            - params.vacuum * ns_N
+            - params.connectivity * (ns_lcs / max(1, ns_N))
+            + params.size_penalty * ns_N**2
+            - params.topology_reward * ns_T / max(1, ns_N)
         )
         return float(priority * np.exp(-(ns_E - E)))
 
